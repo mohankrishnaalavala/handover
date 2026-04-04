@@ -1,0 +1,38 @@
+{
+  "uuid": "fixture-conversation-001",
+  "name": "API Design Discussion",
+  "created_at": "2026-04-01T09:00:00.000Z",
+  "updated_at": "2026-04-01T10:30:00.000Z",
+  "chat_messages": [
+    {
+      "uuid": "msg-001",
+      "sender": "human",
+      "text": "I want to build a REST API for a task management app. It needs user auth, tasks CRUD, and team support.",
+      "created_at": "2026-04-01T09:00:00.000Z"
+    },
+    {
+      "uuid": "msg-002",
+      "sender": "assistant",
+      "text": "Great project! Let's use FastAPI for the framework — it gives us automatic OpenAPI docs and async support out of the box.\n\nFor the stack I'd suggest:\n- Language: Python 3.11+\n- Framework: FastAPI\n- Database: PostgreSQL\n- Auth: JWT tokens\n- Testing: pytest",
+      "created_at": "2026-04-01T09:02:00.000Z"
+    },
+    {
+      "uuid": "msg-003",
+      "sender": "human",
+      "text": "Let's use JWT for auth, stateless is important. It must run offline and cannot call any external analytics services.",
+      "created_at": "2026-04-01T09:05:00.000Z"
+    },
+    {
+      "uuid": "msg-004",
+      "sender": "assistant",
+      "text": "Agreed — JWT is the right call for a stateless API. Here are the next steps:\n\n1. Set up FastAPI project scaffold\n2. Implement JWT auth middleware\n3. Define PostgreSQL schema\n4. Write unit tests for auth\n5. Add tasks CRUD endpoints\n6. Add team membership endpoints\n\nOpen question: Which ORM should we use — SQLAlchemy vs Tortoise ORM?",
+      "created_at": "2026-04-01T09:08:00.000Z"
+    },
+    {
+      "uuid": "msg-005",
+      "sender": "human",
+      "text": "Mobile app is out of scope for v1. Let's keep it API only.",
+      "created_at": "2026-04-01T09:10:00.000Z"
+    }
+  ]
+}
