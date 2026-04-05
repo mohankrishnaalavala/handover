@@ -87,13 +87,18 @@ def _summarize_with_llm(messages: list[ConversationMessage]) -> HandoverContext:
         HandoverAPIError: On authentication failure or API error.
     """
     conversation_text = "\n".join(f"{m.role.upper()}: {m.content}" for m in messages)
+    # Truncate very long conversations to stay within context limits while preserving
+    # the most recent messages (which contain the final decisions and tasks).
+    _MAX_CONV_CHARS = 60_000
+    if len(conversation_text) > _MAX_CONV_CHARS:
+        conversation_text = conversation_text[-_MAX_CONV_CHARS:]
     prompt = EXTRACTION_PROMPT.format(conversation=conversation_text)
 
     try:
         client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from environment
         response = client.messages.create(
             model=_MODEL,
-            max_tokens=2048,
+            max_tokens=4096,
             messages=[{"role": "user", "content": prompt}],
         )
     except anthropic.AuthenticationError as e:
@@ -108,8 +113,14 @@ def _summarize_with_llm(messages: list[ConversationMessage]) -> HandoverContext:
     if not isinstance(raw_text, str):
         raise HandoverAPIError("Unexpected response block type from API.")
 
+    # Strip markdown code fences if the model wrapped the JSON in ```json ... ```
+    stripped = raw_text.strip()
+    if stripped.startswith("```"):
+        lines = stripped.splitlines()
+        stripped = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+
     try:
-        raw = json.loads(raw_text)
+        raw = json.loads(stripped)
     except json.JSONDecodeError as e:
         raise HandoverAPIError(
             f"Model returned invalid JSON: {e}. Raw response: {raw_text[:200]}"

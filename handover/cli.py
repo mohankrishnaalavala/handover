@@ -143,13 +143,13 @@ def main(
                 (
                     c
                     for c in conversations
-                    if (title and c["title"].strip().lower() == title.strip().lower())
+                    if (title and title.strip().lower() in c["title"].strip().lower())
                     or (conversation_id and c["id"] == conversation_id)
                 ),
                 None,
             )
             if selected_conv is None:
-                hint = f"title={title!r}" if title else f"id={conversation_id!r}"
+                hint = f"title={title!r} (substring match)" if title else f"id={conversation_id!r}"
                 raise click.ClickException(
                     f"No conversation found with {hint}. "
                     "Run `handover list <export_file>` to see available conversations."
@@ -278,11 +278,10 @@ def list_conversations(export_file: str, source: str | None) -> None:
 
     # Table header
     click.echo(f"\n{'ID':<38}  {'DATE':<12}  TITLE")
-    click.echo("-" * 80)
+    click.echo("-" * 100)
     for conv in conversations:
         date = conv["date"][:10] if conv["date"] else "unknown   "
-        title = conv["title"][:35] if len(conv["title"]) > 35 else conv["title"]
-        click.echo(f"{conv['id']:<38}  {date:<12}  {title}")
+        click.echo(f"{conv['id']:<38}  {date:<12}  {conv['title']}")
     click.echo(f"\n{len(conversations)} conversation(s) found.")
 
 
