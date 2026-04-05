@@ -15,6 +15,7 @@ develop-eggs/
 .installed.cfg
 lib/
 lib64/
+conversations.json
 
 # Virtual environments
 .env
