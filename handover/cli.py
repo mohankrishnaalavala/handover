@@ -135,10 +135,11 @@ def main(
 
     # Parse the file — generalized conversation filter via BaseParser.parse_by_id()
     messages = None
+    selected_conv: dict[str, str] | None = None
     try:
         if title or conversation_id:
             conversations = parser.list_conversations(input_path)
-            target = next(
+            selected_conv = next(
                 (
                     c
                     for c in conversations
@@ -147,13 +148,13 @@ def main(
                 ),
                 None,
             )
-            if target is None:
+            if selected_conv is None:
                 hint = f"title={title!r}" if title else f"id={conversation_id!r}"
                 raise click.ClickException(
                     f"No conversation found with {hint}. "
                     "Run `handover list <export_file>` to see available conversations."
                 )
-            messages = parser.parse_by_id(input_path, target["id"])
+            messages = parser.parse_by_id(input_path, selected_conv["id"])
         else:
             messages = parser.parse(input_path)
     except click.ClickException:
@@ -177,17 +178,27 @@ def main(
     fmt_version = parser.detect_format_version(input_path)
     context.source_version = fmt_version
 
-    # Try to read conversation title from Claude single-JSON exports
-    if not context.conversation_title and source == "claude":
-        try:
-            import json as _json
+    # Populate conversation title/id from file metadata if not set by summarizer
+    if not context.conversation_title:
+        if selected_conv:
+            # We already have the target conversation's metadata
+            context.conversation_title = selected_conv.get("title", "")
+            context.conversation_id = selected_conv.get("id")
+        elif source == "claude":
+            try:
+                import json as _json
 
-            if input_path.suffix.lower() == ".json":
-                data = _json.loads(input_path.read_text(encoding="utf-8"))
-                context.conversation_title = data.get("name", "")
-                context.conversation_id = data.get("uuid")
-        except Exception:
-            pass
+                if input_path.suffix.lower() == ".json":
+                    data = _json.loads(input_path.read_text(encoding="utf-8"))
+                    # JSON array — use first conversation
+                    if isinstance(data, list) and data:
+                        context.conversation_title = data[0].get("name", "")
+                        context.conversation_id = data[0].get("uuid")
+                    elif isinstance(data, dict):
+                        context.conversation_title = data.get("name", "")
+                        context.conversation_id = data.get("uuid")
+            except Exception:
+                pass
 
     # Generate artifacts
     from handover.generator import Generator

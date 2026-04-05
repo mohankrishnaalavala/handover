@@ -108,11 +108,18 @@ class ClaudeParser(BaseParser):
             )
 
     def _parse_single_json(self, path: Path) -> list[ConversationMessage]:
-        """Parse a single-conversation JSON export from the browser extension."""
+        """Parse a single-conversation JSON export from the browser extension,
+        or the first conversation from a JSON array bulk export."""
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON in {path}: {e}") from e
+
+        # Claude Settings → Export Data gives a JSON array (not JSONL)
+        if isinstance(data, list):
+            if not data:
+                return []
+            return _messages_from_raw(data[0].get("chat_messages", []))
 
         raw_messages = data.get("chat_messages") or data.get("messages") or []
         return _messages_from_raw(raw_messages)
@@ -163,16 +170,43 @@ class ClaudeParser(BaseParser):
 
     def list_conversations(self, path: Path) -> list[dict]:  # type: ignore[type-arg]
         """
-        List all conversations in a bulk JSONL export.
+        List all conversations in a bulk export (JSONL or JSON array).
 
         Used by the `handover list` subcommand.
 
         Args:
-            path: Path to the bulk .jsonl export file.
+            path: Path to the bulk export file (.jsonl or .json array).
 
         Returns:
             List of dicts with keys: id, title, date.
         """
+        suffix = path.suffix.lower()
+
+        # JSON array format — real Claude Settings → Export Data output
+        if suffix == ".json":
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Invalid JSON in {path}: {e}") from e
+            if not isinstance(data, list):
+                # Single-conversation JSON — treat as one conversation
+                return [
+                    {
+                        "id": data.get("uuid", ""),
+                        "title": data.get("name", "(untitled)"),
+                        "date": data.get("created_at", ""),
+                    }
+                ]
+            return [
+                {
+                    "id": obj.get("uuid", ""),
+                    "title": obj.get("name", "(untitled)"),
+                    "date": obj.get("created_at", ""),
+                }
+                for obj in data
+            ]
+
+        # JSONL format — one JSON object per line
         result = []
         with path.open(encoding="utf-8") as f:
             for line in f:
@@ -192,6 +226,29 @@ class ClaudeParser(BaseParser):
                 )
         return result
 
+    def parse_by_id(self, path: Path, conversation_id: str) -> list[ConversationMessage]:
+        """
+        Parse a single conversation by its UUID.
+
+        Handles both JSONL and JSON array bulk exports.
+        """
+        suffix = path.suffix.lower()
+
+        if suffix == ".json":
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Invalid JSON in {path}: {e}") from e
+            if isinstance(data, list):
+                for obj in data:
+                    if obj.get("uuid") == conversation_id:
+                        return _messages_from_raw(obj.get("chat_messages", []))
+                return []
+            return _messages_from_raw(data.get("chat_messages", []))
+
+        # JSONL — delegate to existing helper
+        return self._parse_bulk_jsonl(path, conversation_id=conversation_id)
+
     def detect_format_version(self, file_path: Path) -> str:
         """
         Detect the Claude export format version.
@@ -210,6 +267,9 @@ class ClaudeParser(BaseParser):
                 data = json.loads(path.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError):
                 return "unknown"
+            # Real Claude bulk export: JSON array of conversations
+            if isinstance(data, list):
+                return "bulk-json v1.0"
             # v1: {"uuid": ..., "chat_messages": [...], "sender": ...}
             # v2: {"id": ..., "messages": [...], "role": ...}
             if "chat_messages" in data:
