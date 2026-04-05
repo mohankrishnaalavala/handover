@@ -10,6 +10,7 @@ All LLM calls are mocked.
 
 from __future__ import annotations
 
+import builtins as _builtins
 from pathlib import Path
 from unittest.mock import patch
 
@@ -17,6 +18,8 @@ import pytest
 
 from handover.models import FileChange, SessionContext, SessionMeta, Task
 from handover.parsers.claude_code import ClaudeCodeSessionParser
+
+_real_import = _builtins.__import__
 
 FIXTURE = Path(__file__).parent / "fixtures" / "claude_code_session.jsonl"
 
@@ -431,11 +434,6 @@ class TestReverseCLI:
             )
         # Should exit with an error about watchdog
         assert result.exit_code != 0 or "watchdog" in result.output
-
-
-import builtins as _builtins
-
-_real_import = _builtins.__import__
 
 
 def _fake_import_without_watchdog(name: str, *args: object, **kwargs: object) -> object:
