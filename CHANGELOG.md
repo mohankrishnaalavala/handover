@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
-## [Unreleased] — Phase 3 (v0.3.0)
+## [Unreleased] — Phase 3 + Phase 4 (v0.3.0)
 
 ### Added
 - `handover serve` — local HTTP bridge for the browser extension (port 7437 = H-A-N-D)
@@ -20,6 +20,23 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - `scripts/build-extension.sh` — packages `extension/` into `dist/handover-extension.zip`
 - `docs/browser-extension.md` — install and usage guide for the extension
 - `handover/__main__.py` — enables `python -m handover` (used by daemon subprocess)
+
+### Phase 4 additions (reverse handover)
+- `handover reverse` — generate `HANDOVER.md` from a Claude Code session log
+  - Extracts files changed, commands run, decisions, task completion (matched against PLAN.md)
+  - LLM-based decisions + next steps via `claude-sonnet-4-6`; `--no-llm` for offline mode
+  - `--dry-run` to preview without writing
+- `handover sessions` — list recent Claude Code sessions for a project
+- `handover watch` — auto-generate `HANDOVER.md` when a session stops growing  
+  (requires `pip install handover[watch]`; `--daemon` for background mode)
+- `handover/parsers/claude_code.py` — `ClaudeCodeSessionParser` reading `~/.claude/projects/` JSONL
+- `handover/reverse.py` — reverse pipeline orchestrator
+- `handover/watcher.py` — `watchdog`-based session file monitor with debounce
+- `handover/templates/handover_md.j2` — HANDOVER.md Jinja2 template
+- `Generator.generate_handover()` — renders HANDOVER.md from `SessionContext`
+- New models: `FileChange`, `SessionMeta`, `SessionContext` in `models.py`
+- `watchdog>=4.0` optional dependency in `[watch]` extra
+- `docs/reverse-handover.md` — user guide
 
 ## [0.2.0] - 2026-04-05
 

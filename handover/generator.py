@@ -16,7 +16,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from handover import __version__
-from handover.models import HandoverContext
+from handover.models import HandoverContext, SessionContext
 
 DEFAULT_TEMPLATE_DIR = Path(__file__).parent / "templates"
 
@@ -95,4 +95,43 @@ class Generator:
             Rendered PLAN.md as a string.
         """
         template = self._env.get_template("plan_md.j2")
+        return str(template.render(context=context, version=__version__))
+
+    def generate_handover(
+        self,
+        context: SessionContext,
+        output_dir: Path,
+        dry_run: bool = False,
+    ) -> dict[str, str]:
+        """
+        Generate HANDOVER.md from a SessionContext (Phase 4 reverse pipeline).
+
+        Args:
+            context: Populated SessionContext from the reverse orchestrator.
+            output_dir: Directory to write the output file.
+            dry_run: If True, return rendered content without writing files.
+
+        Returns:
+            Dict mapping filename to rendered content: {"HANDOVER.md": "..."}
+        """
+        handover_md = self.render_handover_md(context)
+        result = {"HANDOVER.md": handover_md}
+
+        if not dry_run:
+            output_dir.mkdir(parents=True, exist_ok=True)
+            (output_dir / "HANDOVER.md").write_text(handover_md, encoding="utf-8")
+
+        return result
+
+    def render_handover_md(self, context: SessionContext) -> str:
+        """
+        Render the HANDOVER.md artifact for a Claude Code session.
+
+        Args:
+            context: Populated SessionContext.
+
+        Returns:
+            Rendered HANDOVER.md as a string.
+        """
+        template = self._env.get_template("handover_md.j2")
         return str(template.render(context=context, version=__version__))

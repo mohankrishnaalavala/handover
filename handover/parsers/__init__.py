@@ -16,6 +16,7 @@ from pathlib import Path
 from handover.parsers.base import BaseParser
 from handover.parsers.chatgpt import ChatGPTParser
 from handover.parsers.claude import ClaudeParser
+from handover.parsers.claude_code import ClaudeCodeSessionParser
 from handover.parsers.gemini import GeminiParser
 from handover.parsers.perplexity import PerplexityParser
 
@@ -24,6 +25,7 @@ ADAPTER_REGISTRY: dict[str, type[BaseParser]] = {
     "chatgpt": ChatGPTParser,
     "gemini": GeminiParser,
     "perplexity": PerplexityParser,
+    "claude-code": ClaudeCodeSessionParser,
 }
 
 

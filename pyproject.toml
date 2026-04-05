@@ -33,6 +33,9 @@ dev = [
   "mypy>=1.10.0",
   "pre-commit>=3.7.0",
 ]
+watch = [
+  "watchdog>=4.0",
+]
 
 [project.scripts]
 handover = "handover.cli:main"

@@ -7,11 +7,15 @@ See PRD Section 7 — Data Model.
 ConversationMessage: normalized chat message from any source adapter.
 HandoverContext: extracted context passed to the generator.
 Decision, Task: sub-models within HandoverContext.
+
+Phase 4 additions:
+FileChange, SessionMeta, SessionContext: models for the reverse-handover pipeline.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 
 
 class HandoverAPIError(Exception):
@@ -81,3 +85,51 @@ class HandoverContext:
     constraints: list[str] = field(default_factory=list)
     non_goals: list[str] = field(default_factory=list)
     open_questions: list[str] = field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 — Reverse handover (Claude Code session → HANDOVER.md)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class FileChange:
+    """A file that was created or modified during a Claude Code session."""
+
+    path: str
+    action: str  # "created" | "modified" | "deleted"
+
+
+@dataclass
+class SessionMeta:
+    """Lightweight metadata for a discovered Claude Code session file."""
+
+    session_id: str
+    project_path: str  # cwd recorded in the session
+    file_path: Path  # absolute path to the .jsonl file
+    started_at: str  # ISO timestamp of first user message
+    git_branch: str
+    message_count: int
+    size_bytes: int
+
+
+@dataclass
+class SessionContext:
+    """
+    Extracted context from a Claude Code session log.
+    Passed to the Generator to produce HANDOVER.md.
+    """
+
+    session_id: str = ""
+    project_name: str = ""
+    generated_at: str = ""
+    started_at: str = ""
+    git_branch: str = ""
+    files_changed: list[FileChange] = field(default_factory=list)
+    commands_run: list[str] = field(default_factory=list)
+    decisions: list[str] = field(default_factory=list)
+    tasks_completed: list[Task] = field(default_factory=list)
+    tasks_remaining: list[Task] = field(default_factory=list)
+    last_action: str = ""
+    context_usage_pct: int | None = None
+    next_steps: list[str] = field(default_factory=list)

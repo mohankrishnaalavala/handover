@@ -391,3 +391,286 @@ def init_templates() -> None:
 
     click.echo(f"\nTemplates scaffolded to {template_dst}")
     click.echo("Edit them, then use: handover --template ~/.handover/templates/ ...")
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 — Reverse handover
+# ---------------------------------------------------------------------------
+
+
+@main.command("reverse")
+@click.option(
+    "--session",
+    "session_file",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to a specific Claude Code session .jsonl file",
+)
+@click.option(
+    "--project",
+    "-p",
+    "project_dir",
+    type=click.Path(),
+    default=None,
+    help="Project root directory (auto-discovers most recent session)",
+)
+@click.option(
+    "--output",
+    "-o",
+    "output_dir",
+    type=click.Path(),
+    default=None,
+    help="Directory to write HANDOVER.md (default: project dir or cwd)",
+)
+@click.option(
+    "--no-llm",
+    is_flag=True,
+    default=False,
+    help="Use heuristic extraction only (no API key required)",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Print what would be written without writing files",
+)
+def reverse_handover(
+    session_file: str | None,
+    project_dir: str | None,
+    output_dir: str | None,
+    no_llm: bool,
+    dry_run: bool,
+) -> None:
+    """
+    Generate HANDOVER.md from a Claude Code session log.
+
+    Reads ~/.claude/projects/<hash>/<session>.jsonl, extracts files changed,
+    decisions made, tasks completed, and recommended next steps.
+
+    Examples:
+
+      handover reverse --project .
+
+      handover reverse --session ~/.claude/projects/abc/session.jsonl
+
+      handover reverse --project . --no-llm --dry-run
+    """
+    from handover.generator import Generator
+    from handover.models import HandoverAPIError
+    from handover.parsers.claude_code import ClaudeCodeSessionParser
+    from handover.reverse import reverse
+
+    resolved_project = Path(project_dir).resolve() if project_dir else Path.cwd().resolve()
+
+    if session_file:
+        resolved_session = Path(session_file)
+    else:
+        # Auto-discover most recent session for this project
+        parser = ClaudeCodeSessionParser()
+        sessions = parser.discover_sessions(resolved_project)
+        if not sessions:
+            raise click.ClickException(
+                f"No Claude Code sessions found for {resolved_project}.\n"
+                "Run a Claude Code session first, or provide --session explicitly."
+            )
+        resolved_session = sessions[0].file_path
+        click.echo(f"Using most recent session: {resolved_session.name}")
+
+    resolved_output = Path(output_dir) if output_dir else resolved_project
+
+    try:
+        context = reverse(
+            session_file=resolved_session,
+            project_dir=resolved_project,
+            use_llm=not no_llm,
+        )
+    except HandoverAPIError as exc:
+        raise click.ClickException(str(exc)) from exc
+    except (ValueError, FileNotFoundError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    gen = Generator()
+
+    if dry_run:
+        result = gen.generate_handover(context, resolved_output, dry_run=True)
+        click.echo(f"\nSession: {context.session_id[:8]}  Branch: {context.git_branch}")
+        click.echo(f"  Files changed : {len(context.files_changed)}")
+        click.echo(f"  Commands run  : {len(context.commands_run)}")
+        click.echo(f"  Decisions     : {len(context.decisions)}")
+        click.echo(f"  Tasks done    : {len(context.tasks_completed)}")
+        click.echo(f"  Tasks remaining: {len(context.tasks_remaining)}")
+        click.echo(f"  Next steps    : {len(context.next_steps)}")
+        click.echo(f"\nWould write to {resolved_output}/:")
+        for filename, content in result.items():
+            size_kb = len(content.encode()) / 1024
+            click.echo(f"  -> {filename}  ({size_kb:.1f} KB)")
+        click.echo("\nRun without --dry-run to write files.")
+    else:
+        gen.generate_handover(context, resolved_output, dry_run=False)
+        click.echo(f"Wrote HANDOVER.md to {resolved_output}/")
+
+
+@main.command("sessions")
+@click.option(
+    "--project",
+    "-p",
+    "project_dir",
+    type=click.Path(),
+    default=None,
+    help="Project root directory (default: cwd)",
+)
+@click.option("--limit", default=10, show_default=True, help="Maximum sessions to list")
+def list_sessions(project_dir: str | None, limit: int) -> None:
+    """
+    List recent Claude Code sessions for a project.
+
+    Reads from ~/.claude/projects/<project-hash>/ and shows session metadata
+    sorted by most recent first.
+
+    Examples:
+
+      handover sessions
+
+      handover sessions --project ~/projects/myapp --limit 20
+    """
+    from handover.parsers.claude_code import ClaudeCodeSessionParser
+
+    resolved = Path(project_dir).resolve() if project_dir else Path.cwd().resolve()
+    parser = ClaudeCodeSessionParser()
+    sessions = parser.discover_sessions(resolved)
+
+    if not sessions:
+        click.echo(f"No Claude Code sessions found for {resolved}")
+        click.echo(
+            f"Expected: ~/.claude/projects/{ClaudeCodeSessionParser.project_hash(resolved)}/"
+        )
+        return
+
+    click.echo(f"\nClaude Code sessions for {resolved.name}/\n")
+    click.echo(f"{'SESSION ID':<38}  {'DATE':<12}  {'BRANCH':<24}  MSGS")
+    click.echo("-" * 90)
+    for s in sessions[:limit]:
+        date = s.started_at[:10] if s.started_at else "unknown   "
+        branch = (s.git_branch or "")[:24]
+        click.echo(f"{s.session_id:<38}  {date:<12}  {branch:<24}  {s.message_count}")
+    click.echo(f"\n{min(len(sessions), limit)} of {len(sessions)} session(s) shown.")
+
+
+@main.command("watch")
+@click.option(
+    "--project",
+    "-p",
+    "project_dir",
+    type=click.Path(),
+    default=None,
+    help="Project root directory to watch (default: cwd)",
+)
+@click.option(
+    "--output",
+    "-o",
+    "output_dir",
+    type=click.Path(),
+    default=None,
+    help="Directory to write HANDOVER.md (default: project dir)",
+)
+@click.option(
+    "--no-llm",
+    is_flag=True,
+    default=False,
+    help="Use heuristic extraction only (no API key required)",
+)
+@click.option(
+    "--idle",
+    default=60,
+    show_default=True,
+    help="Seconds a session file must be idle before processing",
+)
+@click.option(
+    "--daemon",
+    is_flag=True,
+    default=False,
+    help="Run as a background process and return immediately",
+)
+def watch_sessions(
+    project_dir: str | None,
+    output_dir: str | None,
+    no_llm: bool,
+    idle: int,
+    daemon: bool,
+) -> None:
+    """
+    Watch for new Claude Code sessions and auto-generate HANDOVER.md.
+
+    Monitors ~/.claude/projects/<hash>/ for new .jsonl files.  When a session
+    file stops growing for --idle seconds it triggers the reverse pipeline
+    automatically.
+
+    Requires the optional 'watch' dependency:
+      pip install handover[watch]
+
+    Examples:
+
+      handover watch --project .
+
+      handover watch --project . --no-llm --daemon
+    """
+    import sys
+
+    try:
+        import watchdog  # noqa: F401
+    except ImportError as exc:
+        raise click.ClickException(
+            "The 'watchdog' package is required for `handover watch`.\n"
+            "Install it with:  pip install handover[watch]"
+        ) from exc
+
+    resolved_project = Path(project_dir).resolve() if project_dir else Path.cwd().resolve()
+    resolved_output = Path(output_dir).resolve() if output_dir else resolved_project
+
+    if daemon:
+        import subprocess as _subprocess
+
+        log_path = Path.home() / ".handover" / "watch.log"
+        pid_path = Path.home() / ".handover" / "watch.pid"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+
+        cmd = [
+            sys.executable,
+            "-m",
+            "handover",
+            "watch",
+            "--project",
+            str(resolved_project),
+            "--output",
+            str(resolved_output),
+            "--idle",
+            str(idle),
+        ]
+        if no_llm:
+            cmd.append("--no-llm")
+
+        with log_path.open("w") as log_file:
+            proc = _subprocess.Popen(
+                cmd,
+                stdout=log_file,
+                stderr=log_file,
+                start_new_session=True,
+            )
+
+        pid_path.write_text(str(proc.pid))
+        click.echo(f"handover watch started  PID {proc.pid}  project={resolved_project.name}")
+        click.echo(f"Log: {log_path}")
+        return
+
+    from handover.watcher import start_watching
+
+    click.echo(f"Watching Claude Code sessions for {resolved_project.name}/")
+    click.echo(f"Output directory: {resolved_output}")
+    click.echo(f"Idle threshold: {idle}s  |  LLM: {'off' if no_llm else 'on'}")
+    click.echo("Press Ctrl-C to stop.\n")
+    start_watching(
+        project_dir=resolved_project,
+        output_dir=resolved_output,
+        no_llm=no_llm,
+        idle_seconds=idle,
+    )
