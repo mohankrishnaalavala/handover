@@ -239,8 +239,6 @@ class TestExtractOrchestrator:
         assert re.match(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", ctx.extracted_at)
 
     def test_open_questions_populated(self) -> None:
-        messages = [
-            assistant("Which database should we use — PostgreSQL or MySQL?")
-        ]
+        messages = [assistant("Which database should we use — PostgreSQL or MySQL?")]
         ctx = heuristics.extract(messages)
         assert isinstance(ctx.open_questions, list)

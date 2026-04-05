@@ -86,9 +86,7 @@ def _summarize_with_llm(messages: list[ConversationMessage]) -> HandoverContext:
     Raises:
         HandoverAPIError: On authentication failure or API error.
     """
-    conversation_text = "\n".join(
-        f"{m.role.upper()}: {m.content}" for m in messages
-    )
+    conversation_text = "\n".join(f"{m.role.upper()}: {m.content}" for m in messages)
     prompt = EXTRACTION_PROMPT.format(conversation=conversation_text)
 
     try:
@@ -104,9 +102,7 @@ def _summarize_with_llm(messages: list[ConversationMessage]) -> HandoverContext:
             "Use --no-llm for rule-based extraction, or set the key in your .env file."
         ) from e
     except anthropic.APIError as e:
-        raise HandoverAPIError(
-            f"Anthropic API error: {e}. Use --no-llm as fallback."
-        ) from e
+        raise HandoverAPIError(f"Anthropic API error: {e}. Use --no-llm as fallback.") from e
 
     raw_text = response.content[0].text
     try:

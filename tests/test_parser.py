@@ -86,7 +86,9 @@ class TestClaudeParserBulkJSONL:
         parser = ClaudeParser()
         conversations = parser.list_conversations(FIXTURES / "claude_bulk.jsonl")
         second_id = conversations[1]["id"]
-        messages = parser._parse_bulk_jsonl(FIXTURES / "claude_bulk.jsonl", conversation_id=second_id)
+        messages = parser._parse_bulk_jsonl(
+            FIXTURES / "claude_bulk.jsonl", conversation_id=second_id
+        )
         assert len(messages) == 2
         assert "database schema" in messages[0].content.lower()
 

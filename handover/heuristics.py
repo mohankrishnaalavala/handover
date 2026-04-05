@@ -82,10 +82,25 @@ TASK_PATTERNS = [
 TECH_KEYWORDS: dict[str, list[str]] = {
     "language": ["python", "typescript", "javascript", "go", "rust", "java", "ruby", "kotlin"],
     "framework": [
-        "fastapi", "flask", "django", "express", "nextjs", "react", "vue", "angular", "rails"
+        "fastapi",
+        "flask",
+        "django",
+        "express",
+        "nextjs",
+        "react",
+        "vue",
+        "angular",
+        "rails",
     ],
     "database": [
-        "postgresql", "postgres", "mysql", "sqlite", "mongodb", "redis", "dynamodb", "supabase"
+        "postgresql",
+        "postgres",
+        "mysql",
+        "sqlite",
+        "mongodb",
+        "redis",
+        "dynamodb",
+        "supabase",
     ],
     "testing": ["pytest", "jest", "unittest", "vitest", "mocha", "cypress"],
     "infra": ["docker", "kubernetes", "aws", "gcp", "azure", "vercel", "railway", "fly.io"],
@@ -316,7 +331,7 @@ def extract_tasks(messages: list[ConversationMessage]) -> list[Task]:
             for pattern in TASK_PATTERNS:
                 idx = lower.find(pattern)
                 if idx != -1:
-                    content = content[idx + len(pattern):]
+                    content = content[idx + len(pattern) :]
                     break
 
         # Extract all list items from (possibly trimmed) content

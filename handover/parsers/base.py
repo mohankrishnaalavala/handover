@@ -26,7 +26,7 @@ class BaseParser(ABC):
     a normalized list of ConversationMessage objects in chronological order.
     """
 
-    source_name: str = ""   # Must be set by each subclass (e.g. "claude", "chatgpt")
+    source_name: str = ""  # Must be set by each subclass (e.g. "claude", "chatgpt")
 
     @abstractmethod
     def parse(self, file_path: Path) -> list[ConversationMessage]:

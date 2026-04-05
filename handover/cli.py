@@ -24,39 +24,60 @@ from handover import __version__
 @click.group(invoke_without_command=True)
 @click.pass_context
 @click.option(
-    "--input", "-i", "input_file", type=click.Path(exists=True), required=False,
+    "--input",
+    "-i",
+    "input_file",
+    type=click.Path(exists=True),
+    required=False,
     help="Path to the chat export file (.json, .jsonl, .md)",
 )
 @click.option(
-    "--output", "-o", "output_dir", type=click.Path(), required=False,
+    "--output",
+    "-o",
+    "output_dir",
+    type=click.Path(),
+    required=False,
     help="Directory to write CLAUDE.md and PLAN.md",
 )
 @click.option(
-    "--source", type=click.Choice(["claude"]), default=None,
+    "--source",
+    type=click.Choice(["claude"]),
+    default=None,
     help="Force a specific parser adapter (default: auto-detect)",
 )
 @click.option(
-    "--title", default=None,
+    "--title",
+    default=None,
     help="Select conversation by title from a bulk JSONL export",
 )
 @click.option(
-    "--id", "conversation_id", default=None,
+    "--id",
+    "conversation_id",
+    default=None,
     help="Select conversation by ID from a bulk JSONL export",
 )
 @click.option(
-    "--dry-run", is_flag=True, default=False,
+    "--dry-run",
+    is_flag=True,
+    default=False,
     help="Print what would be written without writing files",
 )
 @click.option(
-    "--no-llm", is_flag=True, default=False,
+    "--no-llm",
+    is_flag=True,
+    default=False,
     help="Use rule-based extraction only (no API key required)",
 )
 @click.option(
-    "--launch", is_flag=True, default=False,
+    "--launch",
+    is_flag=True,
+    default=False,
     help="Run `claude` in the output directory after writing files",
 )
 @click.option(
-    "--template", type=click.Path(), default=None,
+    "--template",
+    type=click.Path(),
+    default=None,
     help="Path to custom Jinja2 templates directory",
 )
 @click.version_option(version=__version__, prog_name="handover")
@@ -120,7 +141,8 @@ def main(
             conversations = parser.list_conversations(input_path)
             target = next(
                 (
-                    c for c in conversations
+                    c
+                    for c in conversations
                     if (title and c["title"].strip().lower() == title.strip().lower())
                     or (conversation_id and c["id"] == conversation_id)
                 ),
@@ -180,11 +202,9 @@ def main(
         click.echo(f"\nParsing: {context.conversation_title or input_path.name!r}")
         click.echo(f"  Source : {source} ({fmt_version})")
         click.echo(f"  Messages: {len(messages)}")
-        click.echo(f"\nExtracted:")
+        click.echo("\nExtracted:")
         click.echo(f"  Goal       : {context.goal or '(none detected)'}")
-        click.echo(
-            f"  Tech Stack : {', '.join(context.tech_stack.values()) or '(none detected)'}"
-        )
+        click.echo(f"  Tech Stack : {', '.join(context.tech_stack.values()) or '(none detected)'}")
         click.echo(f"  Decisions  : {len(context.decisions)}")
         click.echo(f"  Tasks      : {len(context.tasks)}")
         click.echo(f"  Constraints: {len(context.constraints)}")
