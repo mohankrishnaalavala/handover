@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Git pre-push hook: run ruff + mypy before any push.
+# Install via: bash scripts/install-hooks.sh
+set -e
+
+echo "Running lint checks before push..."
+ruff check handover/ tests/
+ruff format --check handover/ tests/
+mypy handover/
+echo "Lint passed — pushing."

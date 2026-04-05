@@ -248,6 +248,7 @@ class TestInitCommand:
             runner.isolated_filesystem(temp_dir=tmp_path),
             patch("handover.cli.Path.home", return_value=tmp_path),
         ):
+            # Patch Path.home() to use tmp_path so we don't write to real home
             result = runner.invoke(main, ["init"])
         assert result.exit_code == 0, result.output
         assert "Templates scaffolded" in result.output

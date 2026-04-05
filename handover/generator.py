@@ -82,7 +82,7 @@ class Generator:
             Rendered CLAUDE.md as a string.
         """
         template = self._env.get_template("claude_md.j2")
-        return template.render(context=context, version=__version__)
+        return str(template.render(context=context, version=__version__))
 
     def render_plan_md(self, context: HandoverContext) -> str:
         """
@@ -95,4 +95,4 @@ class Generator:
             Rendered PLAN.md as a string.
         """
         template = self._env.get_template("plan_md.j2")
-        return template.render(context=context, version=__version__)
+        return str(template.render(context=context, version=__version__))
