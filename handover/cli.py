@@ -285,6 +285,90 @@ def list_conversations(export_file: str, source: str | None) -> None:
     click.echo(f"\n{len(conversations)} conversation(s) found.")
 
 
+@main.command("serve")
+@click.option("--port", default=7437, show_default=True, help="Port to listen on (7437 = H-A-N-D)")
+@click.option(
+    "--output",
+    "-o",
+    "output_dir",
+    type=click.Path(),
+    default=None,
+    help="Directory where CLAUDE.md + PLAN.md are written (default: cwd)",
+)
+@click.option(
+    "--no-llm",
+    is_flag=True,
+    default=False,
+    help="Use rule-based extraction only (no API key required)",
+)
+@click.option(
+    "--daemon",
+    is_flag=True,
+    default=False,
+    help="Run as a background process and return immediately",
+)
+def serve(port: int, output_dir: str | None, no_llm: bool, daemon: bool) -> None:
+    """
+    Start the local HTTP bridge for the browser extension.
+
+    The server listens for POST /handover requests from the Chrome/Firefox
+    extension and runs the full pipeline, writing CLAUDE.md and PLAN.md to
+    the configured output directory.
+
+    Endpoints:
+      GET  /health   — liveness check
+      POST /handover — run pipeline from raw conversation JSON
+      POST /config   — update output_dir / no_llm at runtime
+
+    Examples:
+
+      handover serve
+
+      handover serve --port 7437 --output ~/projects/myapp/
+
+      handover serve --no-llm --daemon
+    """
+    import subprocess as _subprocess
+    import sys
+
+    resolved_output = output_dir or str(Path.cwd())
+
+    if daemon:
+        log_path = Path.home() / ".handover" / "server.log"
+        pid_path = Path.home() / ".handover" / "server.pid"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+
+        cmd = [
+            sys.executable,
+            "-m",
+            "handover",
+            "serve",
+            "--port",
+            str(port),
+            "--output",
+            resolved_output,
+        ]
+        if no_llm:
+            cmd.append("--no-llm")
+
+        with log_path.open("w") as log_file:
+            proc = _subprocess.Popen(
+                cmd,
+                stdout=log_file,
+                stderr=log_file,
+                start_new_session=True,
+            )
+
+        pid_path.write_text(str(proc.pid))
+        click.echo(f"handover serve started  PID {proc.pid}  http://localhost:{port}")
+        click.echo(f"Log: {log_path}")
+        return
+
+    from handover.server import run_server
+
+    run_server(port=port, output_dir=resolved_output, no_llm=no_llm)
+
+
 @main.command("init")
 def init_templates() -> None:
     """

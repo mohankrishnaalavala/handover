@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>handover</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="header">
+    <span class="logo">handover</span>
+    <span class="tagline">Design in chat. Build in terminal.</span>
+  </div>
+
+  <div class="section">
+    <label for="output-dir">Output directory</label>
+    <input
+      id="output-dir"
+      type="text"
+      placeholder="~/projects/myapp/"
+      spellcheck="false"
+    />
+  </div>
+
+  <div class="section">
+    <label for="port">Server port</label>
+    <input id="port" type="number" value="7437" min="1024" max="65535" />
+  </div>
+
+  <button id="btn-handover" class="primary">
+    Send to Claude Code
+  </button>
+
+  <div id="status" class="status hidden"></div>
+
+  <div class="footer">
+    <a id="settings-link" href="#" title="How to start the server">
+      Run <code>handover serve</code> first
+    </a>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
