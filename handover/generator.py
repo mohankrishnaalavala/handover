@@ -13,9 +13,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from handover.models import HandoverContext
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-# TODO: implement — see PRD Section 6 and PRD Section 10
+from handover import __version__
+from handover.models import HandoverContext
 
 DEFAULT_TEMPLATE_DIR = Path(__file__).parent / "templates"
 
@@ -34,7 +35,12 @@ class Generator:
                           Defaults to handover/templates/ (bundled defaults).
         """
         self.template_dir = template_dir or DEFAULT_TEMPLATE_DIR
-        # TODO: implement — load Jinja2 environment from template_dir
+        self._env = Environment(
+            loader=FileSystemLoader(str(self.template_dir)),
+            autoescape=select_autoescape([]),  # Markdown output — no HTML escaping
+            trim_blocks=True,
+            lstrip_blocks=True,
+        )
 
     def generate(
         self,
@@ -54,8 +60,16 @@ class Generator:
             Dict mapping filename to rendered content:
             {"CLAUDE.md": "...", "PLAN.md": "..."}
         """
-        # TODO: implement
-        raise NotImplementedError
+        claude_md = self.render_claude_md(context)
+        plan_md = self.render_plan_md(context)
+        result = {"CLAUDE.md": claude_md, "PLAN.md": plan_md}
+
+        if not dry_run:
+            output_dir.mkdir(parents=True, exist_ok=True)
+            (output_dir / "CLAUDE.md").write_text(claude_md, encoding="utf-8")
+            (output_dir / "PLAN.md").write_text(plan_md, encoding="utf-8")
+
+        return result
 
     def render_claude_md(self, context: HandoverContext) -> str:
         """
@@ -67,8 +81,8 @@ class Generator:
         Returns:
             Rendered CLAUDE.md as a string.
         """
-        # TODO: implement — render claude_md.j2 with context
-        raise NotImplementedError
+        template = self._env.get_template("claude_md.j2")
+        return str(template.render(context=context, version=__version__))
 
     def render_plan_md(self, context: HandoverContext) -> str:
         """
@@ -80,5 +94,5 @@ class Generator:
         Returns:
             Rendered PLAN.md as a string.
         """
-        # TODO: implement — render plan_md.j2 with context
-        raise NotImplementedError
+        template = self._env.get_template("plan_md.j2")
+        return str(template.render(context=context, version=__version__))

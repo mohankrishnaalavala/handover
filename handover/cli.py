@@ -12,36 +12,74 @@ Subcommands:
 
 from __future__ import annotations
 
-import sys
+import shutil
+import subprocess
 from pathlib import Path
 
 import click
 
 from handover import __version__
 
-# TODO: implement — see PRD Section 11
-
 
 @click.group(invoke_without_command=True)
 @click.pass_context
-@click.option("--input", "-i", "input_file", type=click.Path(exists=True), required=False,
-              help="Path to the chat export file (.json, .jsonl, .md)")
-@click.option("--output", "-o", "output_dir", type=click.Path(), required=False,
-              help="Directory to write CLAUDE.md and PLAN.md")
-@click.option("--source", type=click.Choice(["claude"]), default=None,
-              help="Force a specific parser adapter (default: auto-detect)")
-@click.option("--title", default=None,
-              help="Select conversation by title from a bulk JSONL export")
-@click.option("--id", "conversation_id", default=None,
-              help="Select conversation by ID from a bulk JSONL export")
-@click.option("--dry-run", is_flag=True, default=False,
-              help="Print what would be written without writing files")
-@click.option("--no-llm", is_flag=True, default=False,
-              help="Use rule-based extraction only (no API key required)")
-@click.option("--launch", is_flag=True, default=False,
-              help="Run `claude` in the output directory after writing files")
-@click.option("--template", type=click.Path(), default=None,
-              help="Path to custom Jinja2 templates directory")
+@click.option(
+    "--input",
+    "-i",
+    "input_file",
+    type=click.Path(exists=True),
+    required=False,
+    help="Path to the chat export file (.json, .jsonl, .md)",
+)
+@click.option(
+    "--output",
+    "-o",
+    "output_dir",
+    type=click.Path(),
+    required=False,
+    help="Directory to write CLAUDE.md and PLAN.md",
+)
+@click.option(
+    "--source",
+    type=click.Choice(["claude"]),
+    default=None,
+    help="Force a specific parser adapter (default: auto-detect)",
+)
+@click.option(
+    "--title",
+    default=None,
+    help="Select conversation by title from a bulk JSONL export",
+)
+@click.option(
+    "--id",
+    "conversation_id",
+    default=None,
+    help="Select conversation by ID from a bulk JSONL export",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Print what would be written without writing files",
+)
+@click.option(
+    "--no-llm",
+    is_flag=True,
+    default=False,
+    help="Use rule-based extraction only (no API key required)",
+)
+@click.option(
+    "--launch",
+    is_flag=True,
+    default=False,
+    help="Run `claude` in the output directory after writing files",
+)
+@click.option(
+    "--template",
+    type=click.Path(),
+    default=None,
+    help="Path to custom Jinja2 templates directory",
+)
 @click.version_option(version=__version__, prog_name="handover")
 def main(
     ctx: click.Context,
@@ -74,22 +112,121 @@ def main(
     if ctx.invoked_subcommand is not None:
         return
 
-    # TODO: implement main command logic
-    # 1. Validate --input and --output are provided
-    # 2. Detect or use explicit --source to get the right parser
-    # 3. Parse the file (and filter by --title/--id if bulk JSONL)
-    # 4. Summarize (LLM or heuristics based on --no-llm)
-    # 5. Generate artifacts (respect --dry-run and --template)
-    # 6. If --launch, exec `claude` in output_dir
-
+    # Validate required flags
     if not input_file:
-        click.echo("Error: --input is required.", err=True)
-        sys.exit(1)
+        raise click.UsageError("--input is required.")
     if not output_dir:
-        click.echo("Error: --output is required.", err=True)
-        sys.exit(1)
+        raise click.UsageError("--output is required.")
 
-    click.echo("handover: not yet implemented — see PLAN.md for implementation tasks")
+    from handover.models import HandoverAPIError
+    from handover.parsers import detect_source, get_parser
+    from handover.parsers.claude import ClaudeParser
+
+    input_path = Path(input_file)
+    output_path = Path(output_dir)
+
+    # Auto-detect source adapter
+    if source is None:
+        try:
+            source = detect_source(str(input_path))
+        except ValueError as e:
+            raise click.ClickException(str(e)) from e
+
+    parser = get_parser(source)
+
+    # Parse the file — handle optional conversation filter for bulk JSONL
+    messages = None
+    if input_path.suffix.lower() == ".jsonl" and isinstance(parser, ClaudeParser):
+        if title or conversation_id:
+            conversations = parser.list_conversations(input_path)
+            target = next(
+                (
+                    c
+                    for c in conversations
+                    if (title and c["title"].strip().lower() == title.strip().lower())
+                    or (conversation_id and c["id"] == conversation_id)
+                ),
+                None,
+            )
+            if target is None:
+                hint = f"title={title!r}" if title else f"id={conversation_id!r}"
+                raise click.ClickException(
+                    f"No conversation found with {hint}. "
+                    "Run `handover list <export.jsonl>` to see available conversations."
+                )
+            messages = parser._parse_bulk_jsonl(input_path, conversation_id=target["id"])
+        else:
+            messages = parser.parse(input_path)
+    else:
+        try:
+            messages = parser.parse(input_path)
+        except (FileNotFoundError, ValueError) as e:
+            raise click.ClickException(str(e)) from e
+
+    if not messages:
+        raise click.ClickException("No messages found in the export file.")
+
+    # Summarize
+    from handover import summarizer
+
+    try:
+        context = summarizer.summarize(messages, use_llm=not no_llm)
+    except HandoverAPIError as e:
+        raise click.ClickException(str(e)) from e
+
+    # Populate metadata not set by summarizer
+    context.source = source
+    fmt_version = parser.detect_format_version(input_path)
+    context.source_version = fmt_version
+
+    # Try to read conversation title from the file
+    if not context.conversation_title and isinstance(parser, ClaudeParser):
+        try:
+            import json as _json
+
+            if input_path.suffix.lower() == ".json":
+                data = _json.loads(input_path.read_text(encoding="utf-8"))
+                context.conversation_title = data.get("name", "")
+                context.conversation_id = data.get("uuid")
+        except Exception:
+            pass
+
+    # Generate artifacts
+    from handover.generator import Generator
+
+    template_dir = Path(template) if template else None
+    gen = Generator(template_dir=template_dir)
+
+    if dry_run:
+        result = gen.generate(context, output_path, dry_run=True)
+        click.echo(f"\nParsing: {context.conversation_title or input_path.name!r}")
+        click.echo(f"  Source : {source} ({fmt_version})")
+        click.echo(f"  Messages: {len(messages)}")
+        click.echo("\nExtracted:")
+        click.echo(f"  Goal       : {context.goal or '(none detected)'}")
+        click.echo(f"  Tech Stack : {', '.join(context.tech_stack.values()) or '(none detected)'}")
+        click.echo(f"  Decisions  : {len(context.decisions)}")
+        click.echo(f"  Tasks      : {len(context.tasks)}")
+        click.echo(f"  Constraints: {len(context.constraints)}")
+        click.echo(f"  Questions  : {len(context.open_questions)}")
+        click.echo(f"\nWould write to {output_path}/:")
+        for filename, content in result.items():
+            size_kb = len(content.encode()) / 1024
+            click.echo(f"  -> {filename}  ({size_kb:.1f} KB)")
+        click.echo("\nRun without --dry-run to write files.")
+    else:
+        gen.generate(context, output_path, dry_run=False)
+        click.echo(f"Wrote CLAUDE.md and PLAN.md to {output_path}/")
+
+    # --launch: open claude in output directory
+    if launch and not dry_run:
+        try:
+            subprocess.run(["claude"], cwd=str(output_path), check=False)
+        except FileNotFoundError:
+            click.echo(
+                "Warning: `claude` command not found. Install Claude Code: https://claude.ai/code",
+                err=True,
+            )
 
 
 @main.command("list")
@@ -104,10 +241,26 @@ def list_conversations(export_file: str) -> None:
 
       handover list export.jsonl
     """
-    # TODO: implement
-    # 1. Use ClaudeParser.list_conversations(export_file)
-    # 2. Print table: ID | DATE | TITLE
-    click.echo("handover list: not yet implemented — see PLAN.md")
+    from handover.parsers.claude import ClaudeParser
+
+    parser = ClaudeParser()
+    try:
+        conversations = parser.list_conversations(Path(export_file))
+    except ValueError as e:
+        raise click.ClickException(str(e)) from e
+
+    if not conversations:
+        click.echo("No conversations found.")
+        return
+
+    # Table header
+    click.echo(f"\n{'ID':<38}  {'DATE':<12}  TITLE")
+    click.echo("-" * 80)
+    for conv in conversations:
+        date = conv["date"][:10] if conv["date"] else "unknown   "
+        title = conv["title"][:35] if len(conv["title"]) > 35 else conv["title"]
+        click.echo(f"{conv['id']:<38}  {date:<12}  {title}")
+    click.echo(f"\n{len(conversations)} conversation(s) found.")
 
 
 @main.command("init")
@@ -121,8 +274,14 @@ def init_templates() -> None:
 
     Then use --template ~/.handover/templates/ on any handover run.
     """
-    # TODO: implement
-    # 1. Create ~/.handover/templates/
-    # 2. Copy bundled templates from handover/templates/
-    # 3. Print confirmation and next steps
-    click.echo("handover init: not yet implemented — see PLAN.md")
+    template_src = Path(__file__).parent / "templates"
+    template_dst = Path.home() / ".handover" / "templates"
+    template_dst.mkdir(parents=True, exist_ok=True)
+
+    for template_file in sorted(template_src.glob("*.j2")):
+        dst = template_dst / template_file.name
+        shutil.copy2(template_file, dst)
+        click.echo(f"  Copied {template_file.name} -> {dst}")
+
+    click.echo(f"\nTemplates scaffolded to {template_dst}")
+    click.echo("Edit them, then use: handover --template ~/.handover/templates/ ...")
