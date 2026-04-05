@@ -104,7 +104,10 @@ def _summarize_with_llm(messages: list[ConversationMessage]) -> HandoverContext:
     except anthropic.APIError as e:
         raise HandoverAPIError(f"Anthropic API error: {e}. Use --no-llm as fallback.") from e
 
-    raw_text = response.content[0].text
+    first_block = response.content[0]
+    if not isinstance(first_block, anthropic.types.TextBlock):
+        raise HandoverAPIError("Unexpected response block type from API.")
+    raw_text = first_block.text
     try:
         raw = json.loads(raw_text)
     except json.JSONDecodeError as e:
