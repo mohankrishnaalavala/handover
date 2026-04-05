@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "handover-cli"           # handover was not confirmed available — using handover-cli
+name = "handover"
 version = "0.1.0"
 description = "Universal AI chat to local agent handover tool"
 readme = "README.md"

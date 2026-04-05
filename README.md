@@ -4,8 +4,8 @@
 
 `handover` is an open-source CLI tool that bridges AI chat interfaces (Claude, ChatGPT, Gemini, and others) to local terminal coding agents (Claude Code, Codex CLI, etc.). It extracts decisions, plans, and intent from a chat conversation and generates structured handover artifacts that a local agent can immediately act on — without re-explaining anything.
 
-[![PyPI version](https://img.shields.io/pypi/v/handover-cli.svg)](https://pypi.org/project/handover-cli/)
-[![Python versions](https://img.shields.io/pypi/pyversions/handover-cli.svg)](https://pypi.org/project/handover-cli/)
+[![PyPI version](https://img.shields.io/pypi/v/handover.svg)](https://pypi.org/project/handover/)
+[![Python versions](https://img.shields.io/pypi/pyversions/handover.svg)](https://pypi.org/project/handover/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/mohankrishnaalavala/handover/actions/workflows/ci.yml/badge.svg)](https://github.com/mohankrishnaalavala/handover/actions/workflows/ci.yml)
 
@@ -14,7 +14,7 @@
 ## Install
 
 ```bash
-pip install handover-cli
+pip install handover
 ```
 
 ---
