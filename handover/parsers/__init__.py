@@ -14,12 +14,16 @@ To add a new source adapter:
 from pathlib import Path
 
 from handover.parsers.base import BaseParser
+from handover.parsers.chatgpt import ChatGPTParser
 from handover.parsers.claude import ClaudeParser
+from handover.parsers.gemini import GeminiParser
+from handover.parsers.perplexity import PerplexityParser
 
 ADAPTER_REGISTRY: dict[str, type[BaseParser]] = {
     "claude": ClaudeParser,
-    # "chatgpt": ChatGPTParser,   # Phase 2
-    # "gemini": GeminiParser,     # Phase 2
+    "chatgpt": ChatGPTParser,
+    "gemini": GeminiParser,
+    "perplexity": PerplexityParser,
 }
 
 
@@ -48,11 +52,18 @@ def detect_source(file_path: str) -> str:
     """
     Auto-detect the source from a file's extension and content.
 
+    Priority ladder (checked in order):
+      1. Claude:      .jsonl  OR  .json with "uuid"/"chat_messages"  OR  .md with **Human:**
+      2. ChatGPT:     .json with "mapping" key + author.role node
+      3. Gemini:      .json with "appActivity" key OR "Gemini Apps" in first 500 bytes
+      4. Perplexity:  .json with "conversations" key + ("sources" in content OR perplexity_ prefix)
+      5. else:        raise ValueError
+
     Args:
         file_path: Path to the export file.
 
     Returns:
-        Source identifier string (e.g. "claude").
+        Source identifier string (e.g. "claude", "chatgpt").
 
     Raises:
         ValueError: If the format cannot be detected.
@@ -61,20 +72,7 @@ def detect_source(file_path: str) -> str:
     suffix = path.suffix.lower()
 
     if suffix == ".jsonl":
-        # Only Claude uses JSONL with the uuid/chat_messages schema
         return "claude"
-
-    if suffix == ".json":
-        try:
-            snippet = path.read_text(encoding="utf-8")[:500]
-            if '"uuid"' in snippet or '"chat_messages"' in snippet:
-                return "claude"
-        except OSError:
-            pass
-        raise ValueError(
-            f"Could not auto-detect source from {path.name}. "
-            "Use --source claude to specify explicitly."
-        )
 
     if suffix == ".md":
         try:
@@ -84,8 +82,36 @@ def detect_source(file_path: str) -> str:
         except OSError:
             pass
         raise ValueError(
+            f"Could not auto-detect source from {path.name}. Use --source to specify explicitly."
+        )
+
+    if suffix == ".json":
+        try:
+            snippet = path.read_text(encoding="utf-8")[:500]
+        except OSError as exc:
+            raise ValueError(f"Could not read {path.name}.") from exc
+
+        # 1. Claude
+        if '"uuid"' in snippet or '"chat_messages"' in snippet:
+            return "claude"
+
+        # 2. ChatGPT: has "mapping" key and at least one node with author.role
+        if '"mapping"' in snippet and '"author"' in snippet:
+            return "chatgpt"
+
+        # 3. Gemini: has "appActivity" key or "Gemini Apps" literal
+        if '"appActivity"' in snippet or "Gemini Apps" in snippet:
+            return "gemini"
+
+        # 4. Perplexity: has "conversations" key AND (sources field OR filename prefix)
+        if '"conversations"' in snippet and (
+            '"sources"' in snippet or path.name.startswith("perplexity_")
+        ):
+            return "perplexity"
+
+        raise ValueError(
             f"Could not auto-detect source from {path.name}. "
-            "Use --source claude to specify explicitly."
+            "Use --source (claude, chatgpt, gemini, perplexity) to specify explicitly."
         )
 
     raise ValueError(

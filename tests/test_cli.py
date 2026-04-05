@@ -266,3 +266,61 @@ class TestGetParser:
 
         with pytest.raises(ValueError, match="No adapter registered"):
             get_parser("unknown_source_xyz")
+
+
+class TestMultiSourceCLI:
+    def test_chatgpt_no_llm_dry_run(self, tmp_path: Path) -> None:
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            [
+                "--input",
+                str(FIXTURES / "chatgpt_single.json"),
+                "--output",
+                str(tmp_path / "out"),
+                "--no-llm",
+                "--dry-run",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert "chatgpt" in result.output.lower()
+
+    def test_gemini_no_llm_dry_run(self, tmp_path: Path) -> None:
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            [
+                "--input",
+                str(FIXTURES / "gemini_single.json"),
+                "--output",
+                str(tmp_path / "out"),
+                "--no-llm",
+                "--dry-run",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert "gemini" in result.output.lower()
+
+    def test_list_perplexity_bulk(self) -> None:
+        runner = CliRunner()
+        result = runner.invoke(main, ["list", str(FIXTURES / "perplexity_bulk.json")])
+        assert result.exit_code == 0, result.output
+        assert "perp-bulk-001" in result.output
+        assert "FastAPI vs Flask" in result.output
+
+    def test_source_flag_overrides_autodetect(self, tmp_path: Path) -> None:
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            [
+                "--input",
+                str(FIXTURES / "gemini_single.json"),
+                "--output",
+                str(tmp_path / "out"),
+                "--source",
+                "gemini",
+                "--no-llm",
+                "--dry-run",
+            ],
+        )
+        assert result.exit_code == 0, result.output

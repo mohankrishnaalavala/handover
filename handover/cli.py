@@ -41,7 +41,7 @@ from handover import __version__
 )
 @click.option(
     "--source",
-    type=click.Choice(["claude"]),
+    type=click.Choice(["claude", "chatgpt", "gemini", "perplexity"]),
     default=None,
     help="Force a specific parser adapter (default: auto-detect)",
 )
@@ -120,7 +120,6 @@ def main(
 
     from handover.models import HandoverAPIError
     from handover.parsers import detect_source, get_parser
-    from handover.parsers.claude import ClaudeParser
 
     input_path = Path(input_file)
     output_path = Path(output_dir)
@@ -134,9 +133,9 @@ def main(
 
     parser = get_parser(source)
 
-    # Parse the file — handle optional conversation filter for bulk JSONL
+    # Parse the file — generalized conversation filter via BaseParser.parse_by_id()
     messages = None
-    if input_path.suffix.lower() == ".jsonl" and isinstance(parser, ClaudeParser):
+    try:
         if title or conversation_id:
             conversations = parser.list_conversations(input_path)
             target = next(
@@ -152,16 +151,15 @@ def main(
                 hint = f"title={title!r}" if title else f"id={conversation_id!r}"
                 raise click.ClickException(
                     f"No conversation found with {hint}. "
-                    "Run `handover list <export.jsonl>` to see available conversations."
+                    "Run `handover list <export_file>` to see available conversations."
                 )
-            messages = parser._parse_bulk_jsonl(input_path, conversation_id=target["id"])
+            messages = parser.parse_by_id(input_path, target["id"])
         else:
             messages = parser.parse(input_path)
-    else:
-        try:
-            messages = parser.parse(input_path)
-        except (FileNotFoundError, ValueError) as e:
-            raise click.ClickException(str(e)) from e
+    except click.ClickException:
+        raise
+    except (FileNotFoundError, ValueError) as e:
+        raise click.ClickException(str(e)) from e
 
     if not messages:
         raise click.ClickException("No messages found in the export file.")
@@ -179,8 +177,8 @@ def main(
     fmt_version = parser.detect_format_version(input_path)
     context.source_version = fmt_version
 
-    # Try to read conversation title from the file
-    if not context.conversation_title and isinstance(parser, ClaudeParser):
+    # Try to read conversation title from Claude single-JSON exports
+    if not context.conversation_title and source == "claude":
         try:
             import json as _json
 
@@ -231,21 +229,35 @@ def main(
 
 @main.command("list")
 @click.argument("export_file", type=click.Path(exists=True))
-def list_conversations(export_file: str) -> None:
+@click.option(
+    "--source",
+    type=click.Choice(["claude", "chatgpt", "gemini", "perplexity"]),
+    default=None,
+    help="Force a specific parser adapter (default: auto-detect)",
+)
+def list_conversations(export_file: str, source: str | None) -> None:
     """
-    List all conversations in a bulk JSONL export.
+    List all conversations in a multi-conversation export file.
 
-    EXPORT_FILE: Path to the bulk .jsonl export from Claude Settings → Privacy → Export Data.
+    EXPORT_FILE: Path to the export file (e.g. bulk .jsonl, conversations.json).
 
     Example:
 
       handover list export.jsonl
+      handover list conversations.json
     """
-    from handover.parsers.claude import ClaudeParser
+    from handover.parsers import detect_source, get_parser
 
-    parser = ClaudeParser()
+    export_path = Path(export_file)
+    if source is None:
+        try:
+            source = detect_source(str(export_path))
+        except ValueError as e:
+            raise click.ClickException(str(e)) from e
+
+    parser = get_parser(source)
     try:
-        conversations = parser.list_conversations(Path(export_file))
+        conversations = parser.list_conversations(export_path)
     except ValueError as e:
         raise click.ClickException(str(e)) from e
 

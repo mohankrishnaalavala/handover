@@ -104,6 +104,7 @@ TECH_KEYWORDS: dict[str, list[str]] = {
     ],
     "testing": ["pytest", "jest", "unittest", "vitest", "mocha", "cypress"],
     "infra": ["docker", "kubernetes", "aws", "gcp", "azure", "vercel", "railway", "fly.io"],
+    "ai": ["claude", "chatgpt", "gemini", "perplexity", "google takeout"],
 }
 
 # Canonical display names for tech keywords (lowercase → display)
@@ -147,6 +148,11 @@ _TECH_CANONICAL: dict[str, str] = {
     "vercel": "Vercel",
     "railway": "Railway",
     "fly.io": "Fly.io",
+    "claude": "Claude",
+    "chatgpt": "ChatGPT",
+    "gemini": "Gemini",
+    "perplexity": "Perplexity",
+    "google takeout": "Google Takeout",
 }
 
 # Compiled regex for "must" with a subject — avoids matching casual "must"

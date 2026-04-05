@@ -15,7 +15,10 @@ import pytest
 
 from handover.models import ConversationMessage
 from handover.parsers import detect_source
+from handover.parsers.chatgpt import ChatGPTParser
 from handover.parsers.claude import ClaudeParser
+from handover.parsers.gemini import GeminiParser
+from handover.parsers.perplexity import PerplexityParser
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -191,3 +194,167 @@ class TestDetectSource:
         generic.write_text('{"messages": []}')
         with pytest.raises(ValueError):
             detect_source(str(generic))
+
+    def test_detects_chatgpt_json(self) -> None:
+        assert detect_source(str(FIXTURES / "chatgpt_single.json")) == "chatgpt"
+
+    def test_detects_gemini_json(self) -> None:
+        assert detect_source(str(FIXTURES / "gemini_single.json")) == "gemini"
+
+    def test_detects_perplexity_json(self) -> None:
+        assert detect_source(str(FIXTURES / "perplexity_single.json")) == "perplexity"
+
+    def test_detects_perplexity_by_filename_prefix(self, tmp_path: Path) -> None:
+        f = tmp_path / "perplexity_export.json"
+        f.write_text('{"conversations": []}')
+        assert detect_source(str(f)) == "perplexity"
+
+
+class TestChatGPTParser:
+    def test_parse_returns_user_and_assistant_only(self) -> None:
+        parser = ChatGPTParser()
+        messages = parser.parse(FIXTURES / "chatgpt_single.json")
+        assert all(m.role in ("user", "assistant") for m in messages)
+
+    def test_skips_system_and_tool_nodes(self) -> None:
+        parser = ChatGPTParser()
+        messages = parser.parse(FIXTURES / "chatgpt_single.json")
+        # system-node and tool-node-1 should be excluded
+        assert len(messages) == 4
+
+    def test_tree_walk_preserves_order(self) -> None:
+        parser = ChatGPTParser()
+        messages = parser.parse(FIXTURES / "chatgpt_single.json")
+        assert messages[0].role == "user"
+        assert messages[1].role == "assistant"
+        assert messages[2].role == "user"
+        assert messages[3].role == "assistant"
+
+    def test_timestamp_is_iso_string(self) -> None:
+        parser = ChatGPTParser()
+        messages = parser.parse(FIXTURES / "chatgpt_single.json")
+        assert messages[0].timestamp is not None
+        assert "T" in messages[0].timestamp  # ISO format
+
+    def test_list_conversations_returns_two_entries(self) -> None:
+        parser = ChatGPTParser()
+        convs = parser.list_conversations(FIXTURES / "chatgpt_single.json")
+        assert len(convs) == 2
+        assert convs[0]["id"] == "chatgpt-conv-001"
+        assert convs[0]["title"] == "Build a FastAPI service"
+
+    def test_parse_by_id_selects_correct_conversation(self) -> None:
+        parser = ChatGPTParser()
+        messages = parser.parse_by_id(FIXTURES / "chatgpt_single.json", "chatgpt-conv-002")
+        assert len(messages) == 2
+        assert "React" in messages[0].content
+
+    def test_missing_file_raises(self) -> None:
+        parser = ChatGPTParser()
+        with pytest.raises(FileNotFoundError):
+            parser.parse(Path("nonexistent_chatgpt.json"))
+
+    def test_format_version(self) -> None:
+        parser = ChatGPTParser()
+        assert parser.detect_format_version(FIXTURES / "chatgpt_single.json") == "chatgpt-json v1.0"
+
+    def test_returns_conversation_message_instances(self) -> None:
+        parser = ChatGPTParser()
+        messages = parser.parse(FIXTURES / "chatgpt_single.json")
+        assert all(isinstance(m, ConversationMessage) for m in messages)
+
+
+class TestGeminiParser:
+    def test_parse_returns_messages(self) -> None:
+        parser = GeminiParser()
+        messages = parser.parse(FIXTURES / "gemini_single.json")
+        # 2 full exchanges + 1 item with empty requestBody (only assistant added)
+        assert len(messages) >= 2
+
+    def test_alternates_user_assistant(self) -> None:
+        parser = GeminiParser()
+        messages = parser.parse(FIXTURES / "gemini_single.json")
+        # First two messages should be user then assistant
+        assert messages[0].role == "user"
+        assert messages[1].role == "assistant"
+
+    def test_empty_request_body_skipped(self) -> None:
+        parser = GeminiParser()
+        messages = parser.parse(FIXTURES / "gemini_single.json")
+        # The third activity item has empty parts in requestBody — user turn skipped
+        roles = [m.role for m in messages]
+        # Should not have two consecutive "assistant" entries from first 2 exchanges
+        # but the final item contributes only an assistant message
+        assert roles.count("user") == 2
+        assert roles.count("assistant") == 3
+
+    def test_list_conversations_returns_empty(self) -> None:
+        parser = GeminiParser()
+        assert parser.list_conversations(FIXTURES / "gemini_single.json") == []
+
+    def test_missing_app_activity_raises(self, tmp_path: Path) -> None:
+        bad = tmp_path / "bad_gemini.json"
+        bad.write_text('{"data": []}')
+        parser = GeminiParser()
+        with pytest.raises(ValueError, match="appActivity"):
+            parser.parse(bad)
+
+    def test_format_version(self) -> None:
+        parser = GeminiParser()
+        version = parser.detect_format_version(FIXTURES / "gemini_single.json")
+        assert version == "gemini-takeout v1.0"
+
+    def test_returns_conversation_message_instances(self) -> None:
+        parser = GeminiParser()
+        messages = parser.parse(FIXTURES / "gemini_single.json")
+        assert all(isinstance(m, ConversationMessage) for m in messages)
+
+
+class TestPerplexityParser:
+    def test_parse_returns_messages(self) -> None:
+        parser = PerplexityParser()
+        messages = parser.parse(FIXTURES / "perplexity_single.json")
+        assert len(messages) >= 4  # 2 user + 1 assistant with sources appended + 1 assistant
+
+    def test_sources_appended_as_assistant_message(self) -> None:
+        parser = PerplexityParser()
+        messages = parser.parse(FIXTURES / "perplexity_single.json")
+        source_msgs = [m for m in messages if m.content.startswith("Sources:")]
+        assert len(source_msgs) == 1
+        assert "asyncio" in source_msgs[0].content
+
+    def test_all_roles_normalized(self) -> None:
+        parser = PerplexityParser()
+        messages = parser.parse(FIXTURES / "perplexity_single.json")
+        assert all(m.role in ("user", "assistant") for m in messages)
+
+    def test_list_conversations_returns_two_entries(self) -> None:
+        parser = PerplexityParser()
+        convs = parser.list_conversations(FIXTURES / "perplexity_bulk.json")
+        assert len(convs) == 2
+        assert convs[0]["id"] == "perp-bulk-001"
+        assert convs[1]["title"] == "Docker best practices"
+
+    def test_parse_by_id_selects_correct_conversation(self) -> None:
+        parser = PerplexityParser()
+        messages = parser.parse_by_id(FIXTURES / "perplexity_bulk.json", "perp-bulk-002")
+        assert "Docker" in messages[0].content
+
+    def test_missing_conversations_key_raises(self, tmp_path: Path) -> None:
+        bad = tmp_path / "bad_perp.json"
+        bad.write_text('{"messages": []}')
+        parser = PerplexityParser()
+        with pytest.raises(ValueError, match="conversations"):
+            parser.parse(bad)
+
+    def test_format_version(self) -> None:
+        parser = PerplexityParser()
+        assert (
+            parser.detect_format_version(FIXTURES / "perplexity_single.json")
+            == "perplexity-json v1.0"
+        )
+
+    def test_returns_conversation_message_instances(self) -> None:
+        parser = PerplexityParser()
+        messages = parser.parse(FIXTURES / "perplexity_single.json")
+        assert all(isinstance(m, ConversationMessage) for m in messages)

@@ -1,0 +1,39 @@
+{
+  "conversations": [
+    {
+      "id": "perp-bulk-001",
+      "title": "FastAPI vs Flask comparison",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Compare FastAPI and Flask for a new REST API project.",
+          "timestamp": "2024-02-01T08:00:00Z"
+        },
+        {
+          "role": "assistant",
+          "content": "FastAPI is the better choice for new projects: async support, automatic OpenAPI docs, and Pydantic validation out of the box.",
+          "timestamp": "2024-02-01T08:00:05Z",
+          "sources": [
+            {"title": "FastAPI docs", "url": "https://fastapi.tiangolo.com"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "perp-bulk-002",
+      "title": "Docker best practices",
+      "messages": [
+        {
+          "role": "user",
+          "content": "What are Docker best practices for Python applications?",
+          "timestamp": "2024-02-02T09:00:00Z"
+        },
+        {
+          "role": "assistant",
+          "content": "Use multi-stage builds, pin base image versions, run as non-root user, and keep layers minimal.",
+          "timestamp": "2024-02-02T09:00:08Z"
+        }
+      ]
+    }
+  ]
+}

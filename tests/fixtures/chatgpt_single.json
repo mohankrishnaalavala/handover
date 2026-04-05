@@ -1,0 +1,108 @@
+[
+  {
+    "id": "chatgpt-conv-001",
+    "title": "Build a FastAPI service",
+    "create_time": 1704067200.0,
+    "mapping": {
+      "root-node": {
+        "id": "root-node",
+        "parent": null,
+        "children": ["system-node", "user-node-1"],
+        "message": null
+      },
+      "system-node": {
+        "id": "system-node",
+        "parent": "root-node",
+        "children": [],
+        "message": {
+          "author": {"role": "system"},
+          "content": {"parts": ["You are a helpful assistant."]},
+          "create_time": 1704067200.0
+        }
+      },
+      "user-node-1": {
+        "id": "user-node-1",
+        "parent": "root-node",
+        "children": ["assistant-node-1"],
+        "message": {
+          "author": {"role": "user"},
+          "content": {"parts": ["I want to build a FastAPI service with PostgreSQL backend."]},
+          "create_time": 1704067260.0
+        }
+      },
+      "assistant-node-1": {
+        "id": "assistant-node-1",
+        "parent": "user-node-1",
+        "children": ["user-node-2"],
+        "message": {
+          "author": {"role": "assistant"},
+          "content": {"parts": ["Great choice! Let's use SQLAlchemy with async support. We'll go with asyncpg as the driver."]},
+          "create_time": 1704067320.0
+        }
+      },
+      "user-node-2": {
+        "id": "user-node-2",
+        "parent": "assistant-node-1",
+        "children": ["tool-node-1"],
+        "message": {
+          "author": {"role": "user"},
+          "content": {"parts": ["Should we use Alembic for migrations?"]},
+          "create_time": 1704067380.0
+        }
+      },
+      "tool-node-1": {
+        "id": "tool-node-1",
+        "parent": "user-node-2",
+        "children": ["assistant-node-2"],
+        "message": {
+          "author": {"role": "tool"},
+          "content": {"parts": ["tool output"]},
+          "create_time": 1704067390.0
+        }
+      },
+      "assistant-node-2": {
+        "id": "assistant-node-2",
+        "parent": "tool-node-1",
+        "children": [],
+        "message": {
+          "author": {"role": "assistant"},
+          "content": {"parts": ["Yes, Alembic is the standard for SQLAlchemy projects. We decided to use Alembic for all schema migrations."]},
+          "create_time": 1704067440.0
+        }
+      }
+    }
+  },
+  {
+    "id": "chatgpt-conv-002",
+    "title": "React component design",
+    "create_time": 1704153600.0,
+    "mapping": {
+      "root2": {
+        "id": "root2",
+        "parent": null,
+        "children": ["msg2-user"],
+        "message": null
+      },
+      "msg2-user": {
+        "id": "msg2-user",
+        "parent": "root2",
+        "children": ["msg2-assistant"],
+        "message": {
+          "author": {"role": "user"},
+          "content": {"parts": ["How should I structure React components for a dashboard?"]},
+          "create_time": 1704153600.0
+        }
+      },
+      "msg2-assistant": {
+        "id": "msg2-assistant",
+        "parent": "msg2-user",
+        "children": [],
+        "message": {
+          "author": {"role": "assistant"},
+          "content": {"parts": ["Use a container/presentational pattern with custom hooks for data fetching."]},
+          "create_time": 1704153660.0
+        }
+      }
+    }
+  }
+]
