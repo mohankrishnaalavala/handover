@@ -1,0 +1,41 @@
+{
+  "appActivity": [
+    {
+      "activityTime": "2024-01-01T10:00:00Z",
+      "requestBody": {
+        "parts": [
+          {"text": "I want to build a Python CLI tool for parsing chat exports."}
+        ]
+      },
+      "responseBody": {
+        "parts": [
+          {"text": "That's a great idea! We should use Click for the CLI framework and Jinja2 for templating."}
+        ]
+      }
+    },
+    {
+      "activityTime": "2024-01-01T10:05:00Z",
+      "requestBody": {
+        "parts": [
+          {"text": "What format should the output files be in?"}
+        ]
+      },
+      "responseBody": {
+        "parts": [
+          {"text": "We'll use Markdown format — CLAUDE.md for project context and PLAN.md for implementation tasks."}
+        ]
+      }
+    },
+    {
+      "activityTime": "2024-01-01T10:10:00Z",
+      "requestBody": {
+        "parts": []
+      },
+      "responseBody": {
+        "parts": [
+          {"text": "This response has no user request body — guard should handle it gracefully."}
+        ]
+      }
+    }
+  ]
+}

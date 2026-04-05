@@ -82,13 +82,29 @@ TASK_PATTERNS = [
 TECH_KEYWORDS: dict[str, list[str]] = {
     "language": ["python", "typescript", "javascript", "go", "rust", "java", "ruby", "kotlin"],
     "framework": [
-        "fastapi", "flask", "django", "express", "nextjs", "react", "vue", "angular", "rails"
+        "fastapi",
+        "flask",
+        "django",
+        "express",
+        "nextjs",
+        "react",
+        "vue",
+        "angular",
+        "rails",
     ],
     "database": [
-        "postgresql", "postgres", "mysql", "sqlite", "mongodb", "redis", "dynamodb", "supabase"
+        "postgresql",
+        "postgres",
+        "mysql",
+        "sqlite",
+        "mongodb",
+        "redis",
+        "dynamodb",
+        "supabase",
     ],
     "testing": ["pytest", "jest", "unittest", "vitest", "mocha", "cypress"],
     "infra": ["docker", "kubernetes", "aws", "gcp", "azure", "vercel", "railway", "fly.io"],
+    "ai": ["claude", "chatgpt", "gemini", "perplexity", "google takeout"],
 }
 
 # Canonical display names for tech keywords (lowercase → display)
@@ -132,6 +148,11 @@ _TECH_CANONICAL: dict[str, str] = {
     "vercel": "Vercel",
     "railway": "Railway",
     "fly.io": "Fly.io",
+    "claude": "Claude",
+    "chatgpt": "ChatGPT",
+    "gemini": "Gemini",
+    "perplexity": "Perplexity",
+    "google takeout": "Google Takeout",
 }
 
 # Compiled regex for "must" with a subject — avoids matching casual "must"
@@ -316,7 +337,7 @@ def extract_tasks(messages: list[ConversationMessage]) -> list[Task]:
             for pattern in TASK_PATTERNS:
                 idx = lower.find(pattern)
                 if idx != -1:
-                    content = content[idx + len(pattern):]
+                    content = content[idx + len(pattern) :]
                     break
 
         # Extract all list items from (possibly trimmed) content

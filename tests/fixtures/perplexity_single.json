@@ -1,0 +1,34 @@
+{
+  "conversations": [
+    {
+      "id": "perp-conv-001",
+      "title": "Best practices for async Python",
+      "messages": [
+        {
+          "role": "user",
+          "content": "What are the best practices for writing async Python services?",
+          "timestamp": "2024-01-15T09:00:00Z"
+        },
+        {
+          "role": "assistant",
+          "content": "Use asyncio with structured concurrency patterns. Always await coroutines and avoid blocking calls in async contexts.",
+          "timestamp": "2024-01-15T09:00:05Z",
+          "sources": [
+            {"title": "Python asyncio docs", "url": "https://docs.python.org/3/library/asyncio.html"},
+            {"title": "Asyncio best practices", "url": "https://docs.python.org/3/library/asyncio-task.html"}
+          ]
+        },
+        {
+          "role": "user",
+          "content": "Should I use aiohttp or httpx for async HTTP calls?",
+          "timestamp": "2024-01-15T09:01:00Z"
+        },
+        {
+          "role": "assistant",
+          "content": "httpx is the modern choice — it supports both sync and async, has a cleaner API, and is actively maintained.",
+          "timestamp": "2024-01-15T09:01:05Z"
+        }
+      ]
+    }
+  ]
+}

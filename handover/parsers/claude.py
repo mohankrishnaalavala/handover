@@ -104,8 +104,7 @@ class ClaudeParser(BaseParser):
             return self._parse_markdown(path)
         else:
             raise ValueError(
-                f"Unsupported file format: {suffix}. "
-                f"Supported formats: .json, .jsonl, .md"
+                f"Unsupported file format: {suffix}. Supported formats: .json, .jsonl, .md"
             )
 
     def _parse_single_json(self, path: Path) -> list[ConversationMessage]:

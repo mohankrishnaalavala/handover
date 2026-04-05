@@ -10,8 +10,6 @@ Tests verify that:
 
 from pathlib import Path
 
-import pytest
-
 from handover import __version__
 from handover.generator import Generator
 from handover.models import Decision, HandoverContext, Task

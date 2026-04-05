@@ -16,7 +16,9 @@ from handover.models import ConversationMessage, HandoverAPIError
 
 def make_messages() -> list[ConversationMessage]:
     return [
-        ConversationMessage(role="user", content="I want to build a FastAPI REST API with JWT auth."),
+        ConversationMessage(
+            role="user", content="I want to build a FastAPI REST API with JWT auth."
+        ),  # noqa: E501
         ConversationMessage(role="assistant", content="Let's use Python, FastAPI, and PostgreSQL."),
         ConversationMessage(role="user", content="It must run offline."),
     ]
@@ -46,14 +48,16 @@ class TestSummarizeWithLLM:
         from handover.models import HandoverContext
 
         with patch("handover.summarizer.anthropic.Anthropic") as mock_client:
-            mock_client.return_value.messages.create.return_value = make_mock_response(_GOOD_PAYLOAD)
+            mock_response = make_mock_response(_GOOD_PAYLOAD)
+            mock_client.return_value.messages.create.return_value = mock_response
             ctx = summarizer.summarize(make_messages(), use_llm=True)
 
         assert isinstance(ctx, HandoverContext)
 
     def test_goal_extracted_correctly(self) -> None:
         with patch("handover.summarizer.anthropic.Anthropic") as mock_client:
-            mock_client.return_value.messages.create.return_value = make_mock_response(_GOOD_PAYLOAD)
+            mock_response = make_mock_response(_GOOD_PAYLOAD)
+            mock_client.return_value.messages.create.return_value = mock_response
             ctx = summarizer.summarize(make_messages(), use_llm=True)
 
         assert ctx.goal == "Build a FastAPI REST API with JWT auth"
@@ -62,7 +66,8 @@ class TestSummarizeWithLLM:
         from handover.models import Decision
 
         with patch("handover.summarizer.anthropic.Anthropic") as mock_client:
-            mock_client.return_value.messages.create.return_value = make_mock_response(_GOOD_PAYLOAD)
+            mock_response = make_mock_response(_GOOD_PAYLOAD)
+            mock_client.return_value.messages.create.return_value = mock_response
             ctx = summarizer.summarize(make_messages(), use_llm=True)
 
         assert len(ctx.decisions) == 1
@@ -73,7 +78,8 @@ class TestSummarizeWithLLM:
         from handover.models import Task
 
         with patch("handover.summarizer.anthropic.Anthropic") as mock_client:
-            mock_client.return_value.messages.create.return_value = make_mock_response(_GOOD_PAYLOAD)
+            mock_response = make_mock_response(_GOOD_PAYLOAD)
+            mock_client.return_value.messages.create.return_value = mock_response
             ctx = summarizer.summarize(make_messages(), use_llm=True)
 
         assert len(ctx.tasks) == 1
@@ -83,7 +89,8 @@ class TestSummarizeWithLLM:
 
     def test_constraints_populated(self) -> None:
         with patch("handover.summarizer.anthropic.Anthropic") as mock_client:
-            mock_client.return_value.messages.create.return_value = make_mock_response(_GOOD_PAYLOAD)
+            mock_response = make_mock_response(_GOOD_PAYLOAD)
+            mock_client.return_value.messages.create.return_value = mock_response
             ctx = summarizer.summarize(make_messages(), use_llm=True)
 
         assert "Must run offline" in ctx.constraints
@@ -102,10 +109,8 @@ class TestSummarizeWithLLM:
         import anthropic
 
         with patch("handover.summarizer.anthropic.Anthropic") as mock_client:
-            mock_client.return_value.messages.create.side_effect = (
-                anthropic.AuthenticationError(
-                    message="invalid key", response=MagicMock(), body=None
-                )
+            mock_client.return_value.messages.create.side_effect = anthropic.AuthenticationError(
+                message="invalid key", response=MagicMock(), body=None
             )
             with pytest.raises(HandoverAPIError, match="ANTHROPIC_API_KEY"):
                 summarizer.summarize(make_messages(), use_llm=True)

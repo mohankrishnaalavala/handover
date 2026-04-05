@@ -13,7 +13,6 @@ import pytest
 from click.testing import CliRunner
 
 from handover.cli import main
-from handover.models import HandoverContext
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -24,7 +23,9 @@ def make_mock_api_response(goal: str = "Build a FastAPI REST API") -> MagicMock:
         "goal": goal,
         "tech_stack": {"language": "Python", "framework": "FastAPI"},
         "decisions": [],
-        "tasks": [{"title": "Set up project", "description": "", "priority": "high", "done": False}],
+        "tasks": [
+            {"title": "Set up project", "description": "", "priority": "high", "done": False}
+        ],
         "constraints": [],
         "non_goals": [],
         "open_questions": [],
@@ -43,8 +44,10 @@ class TestMainCommandNoLLM:
         result = runner.invoke(
             main,
             [
-                "--input", str(FIXTURES / "claude_single.json"),
-                "--output", str(tmp_path),
+                "--input",
+                str(FIXTURES / "claude_single.json"),
+                "--output",
+                str(tmp_path),
                 "--no-llm",
             ],
         )
@@ -57,8 +60,10 @@ class TestMainCommandNoLLM:
         result = runner.invoke(
             main,
             [
-                "--input", str(FIXTURES / "claude_single.json"),
-                "--output", str(tmp_path),
+                "--input",
+                str(FIXTURES / "claude_single.json"),
+                "--output",
+                str(tmp_path),
                 "--no-llm",
                 "--dry-run",
             ],
@@ -72,8 +77,10 @@ class TestMainCommandNoLLM:
         result = runner.invoke(
             main,
             [
-                "--input", str(FIXTURES / "claude_single.json"),
-                "--output", str(tmp_path),
+                "--input",
+                str(FIXTURES / "claude_single.json"),
+                "--output",
+                str(tmp_path),
                 "--no-llm",
                 "--dry-run",
             ],
@@ -86,8 +93,10 @@ class TestMainCommandNoLLM:
         result = runner.invoke(
             main,
             [
-                "--input", str(FIXTURES / "claude_bulk.jsonl"),
-                "--output", str(tmp_path),
+                "--input",
+                str(FIXTURES / "claude_bulk.jsonl"),
+                "--output",
+                str(tmp_path),
                 "--no-llm",
             ],
         )
@@ -99,9 +108,12 @@ class TestMainCommandNoLLM:
         result = runner.invoke(
             main,
             [
-                "--input", str(FIXTURES / "claude_bulk.jsonl"),
-                "--output", str(tmp_path),
-                "--title", "Auth Strategy",
+                "--input",
+                str(FIXTURES / "claude_bulk.jsonl"),
+                "--output",
+                str(tmp_path),
+                "--title",
+                "Auth Strategy",
                 "--no-llm",
             ],
         )
@@ -112,9 +124,12 @@ class TestMainCommandNoLLM:
         result = runner.invoke(
             main,
             [
-                "--input", str(FIXTURES / "claude_bulk.jsonl"),
-                "--output", str(tmp_path),
-                "--title", "This Title Does Not Exist XYZ",
+                "--input",
+                str(FIXTURES / "claude_bulk.jsonl"),
+                "--output",
+                str(tmp_path),
+                "--title",
+                "This Title Does Not Exist XYZ",
                 "--no-llm",
             ],
         )
@@ -126,9 +141,12 @@ class TestMainCommandNoLLM:
         result = runner.invoke(
             main,
             [
-                "--input", str(FIXTURES / "claude_single.json"),
-                "--output", str(tmp_path),
-                "--source", "claude",
+                "--input",
+                str(FIXTURES / "claude_single.json"),
+                "--output",
+                str(tmp_path),
+                "--source",
+                "claude",
                 "--no-llm",
             ],
         )
@@ -139,8 +157,10 @@ class TestMainCommandNoLLM:
         result = runner.invoke(
             main,
             [
-                "--input", str(FIXTURES / "claude_single.md"),
-                "--output", str(tmp_path),
+                "--input",
+                str(FIXTURES / "claude_single.md"),
+                "--output",
+                str(tmp_path),
                 "--no-llm",
             ],
         )
@@ -153,8 +173,10 @@ class TestMainCommandNoLLM:
         result = runner.invoke(
             main,
             [
-                "--input", str(FIXTURES / "claude_single.json"),
-                "--output", str(new_dir),
+                "--input",
+                str(FIXTURES / "claude_single.json"),
+                "--output",
+                str(new_dir),
                 "--no-llm",
             ],
         )
@@ -168,9 +190,7 @@ class TestMainCommandNoLLM:
 
     def test_missing_output_gives_usage_error(self) -> None:
         runner = CliRunner()
-        result = runner.invoke(
-            main, ["--input", str(FIXTURES / "claude_single.json")]
-        )
+        result = runner.invoke(main, ["--input", str(FIXTURES / "claude_single.json")])
         assert result.exit_code != 0
 
     def test_version_flag(self) -> None:
@@ -190,8 +210,10 @@ class TestMainCommandWithLLM:
             result = runner.invoke(
                 main,
                 [
-                    "--input", str(FIXTURES / "claude_single.json"),
-                    "--output", str(tmp_path),
+                    "--input",
+                    str(FIXTURES / "claude_single.json"),
+                    "--output",
+                    str(tmp_path),
                 ],
             )
         assert result.exit_code == 0, result.output
@@ -222,10 +244,11 @@ class TestListCommand:
 class TestInitCommand:
     def test_init_creates_template_files(self, tmp_path: Path) -> None:
         runner = CliRunner()
-        with runner.isolated_filesystem(temp_dir=tmp_path):
-            # Patch Path.home() to use tmp_path so we don't write to real home
-            with patch("handover.cli.Path.home", return_value=tmp_path):
-                result = runner.invoke(main, ["init"])
+        with (
+            runner.isolated_filesystem(temp_dir=tmp_path),
+            patch("handover.cli.Path.home", return_value=tmp_path),
+        ):
+            result = runner.invoke(main, ["init"])
         assert result.exit_code == 0, result.output
         assert "Templates scaffolded" in result.output
 
@@ -242,3 +265,61 @@ class TestGetParser:
 
         with pytest.raises(ValueError, match="No adapter registered"):
             get_parser("unknown_source_xyz")
+
+
+class TestMultiSourceCLI:
+    def test_chatgpt_no_llm_dry_run(self, tmp_path: Path) -> None:
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            [
+                "--input",
+                str(FIXTURES / "chatgpt_single.json"),
+                "--output",
+                str(tmp_path / "out"),
+                "--no-llm",
+                "--dry-run",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert "chatgpt" in result.output.lower()
+
+    def test_gemini_no_llm_dry_run(self, tmp_path: Path) -> None:
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            [
+                "--input",
+                str(FIXTURES / "gemini_single.json"),
+                "--output",
+                str(tmp_path / "out"),
+                "--no-llm",
+                "--dry-run",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert "gemini" in result.output.lower()
+
+    def test_list_perplexity_bulk(self) -> None:
+        runner = CliRunner()
+        result = runner.invoke(main, ["list", str(FIXTURES / "perplexity_bulk.json")])
+        assert result.exit_code == 0, result.output
+        assert "perp-bulk-001" in result.output
+        assert "FastAPI vs Flask" in result.output
+
+    def test_source_flag_overrides_autodetect(self, tmp_path: Path) -> None:
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            [
+                "--input",
+                str(FIXTURES / "gemini_single.json"),
+                "--output",
+                str(tmp_path / "out"),
+                "--source",
+                "gemini",
+                "--no-llm",
+                "--dry-run",
+            ],
+        )
+        assert result.exit_code == 0, result.output

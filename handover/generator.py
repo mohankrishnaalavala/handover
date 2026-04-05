@@ -37,7 +37,7 @@ class Generator:
         self.template_dir = template_dir or DEFAULT_TEMPLATE_DIR
         self._env = Environment(
             loader=FileSystemLoader(str(self.template_dir)),
-            autoescape=select_autoescape([]),   # Markdown output — no HTML escaping
+            autoescape=select_autoescape([]),  # Markdown output — no HTML escaping
             trim_blocks=True,
             lstrip_blocks=True,
         )
