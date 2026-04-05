@@ -39,7 +39,7 @@ def get_parser(source: str) -> BaseParser:
     if source not in ADAPTER_REGISTRY:
         available = ", ".join(ADAPTER_REGISTRY.keys())
         raise ValueError(
-            f"No adapter registered for source '{source}'. " f"Available sources: {available}"
+            f"No adapter registered for source '{source}'. Available sources: {available}"
         )
     return ADAPTER_REGISTRY[source]()
 
@@ -89,5 +89,5 @@ def detect_source(file_path: str) -> str:
         )
 
     raise ValueError(
-        f"Unsupported file extension {suffix!r}. " "Supported formats: .json, .jsonl, .md"
+        f"Unsupported file extension {suffix!r}. Supported formats: .json, .jsonl, .md"
     )

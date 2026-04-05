@@ -224,8 +224,7 @@ def main(
             subprocess.run(["claude"], cwd=str(output_path), check=False)
         except FileNotFoundError:
             click.echo(
-                "Warning: `claude` command not found. "
-                "Install Claude Code: https://claude.ai/code",
+                "Warning: `claude` command not found. Install Claude Code: https://claude.ai/code",
                 err=True,
             )
 
