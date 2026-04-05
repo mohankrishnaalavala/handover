@@ -95,3 +95,6 @@ Icon
 
 # handover-specific
 .handover/
+
+# Claude Code project config (local only — machine-specific permissions)
+.claude/

@@ -13,7 +13,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-# TODO: implement — see PRD Section 7
+
+class HandoverAPIError(Exception):
+    """Raised when the Anthropic API call fails during summarization."""
 
 
 @dataclass
@@ -25,7 +27,13 @@ class ConversationMessage:
     timestamp: str | None = None
     message_id: str | None = None
 
-    # TODO: implement validation (role must be "user" or "assistant")
+    def __post_init__(self) -> None:
+        if self.role not in ("user", "assistant"):
+            raise ValueError(
+                f"role must be 'user' or 'assistant', got {self.role!r}"
+            )
+        if not self.content:
+            raise ValueError("content must not be empty")
 
 
 @dataclass
@@ -35,8 +43,6 @@ class Decision:
     topic: str
     decision: str
     rationale: str = ""
-
-    # TODO: implement
 
 
 @dataclass
@@ -48,7 +54,11 @@ class Task:
     priority: str = "medium"    # "high" | "medium" | "low"
     done: bool = False
 
-    # TODO: implement
+    def __post_init__(self) -> None:
+        if self.priority not in ("high", "medium", "low"):
+            raise ValueError(
+                f"priority must be 'high', 'medium', or 'low', got {self.priority!r}"
+            )
 
 
 @dataclass
@@ -69,11 +79,9 @@ class HandoverContext:
     extracted_at: str = ""              # ISO timestamp
 
     goal: str = ""
-    tech_stack: dict = field(default_factory=dict)
+    tech_stack: dict = field(default_factory=dict)  # type: ignore[type-arg]
     decisions: list[Decision] = field(default_factory=list)
     tasks: list[Task] = field(default_factory=list)
     constraints: list[str] = field(default_factory=list)
     non_goals: list[str] = field(default_factory=list)
     open_questions: list[str] = field(default_factory=list)
-
-    # TODO: implement — see PRD Section 7
