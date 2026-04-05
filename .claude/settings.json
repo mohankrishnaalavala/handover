@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c \"\nimport sys, json, subprocess, re\ndata = json.load(sys.stdin)\ncmd = data.get('command', '')\nif re.search(r'git push', cmd):\n    result = subprocess.run(['ruff', 'check', 'handover/', 'tests/'], capture_output=True, text=True)\n    if result.returncode != 0:\n        print('Lint failed — fix errors before pushing:', file=sys.stderr)\n        print(result.stdout, file=sys.stderr)\n        sys.exit(2)\n\"",
+            "statusMessage": "Checking lint before git push..."
+          }
+        ]
+      }
+    ]
+  }
+}
