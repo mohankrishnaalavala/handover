@@ -121,8 +121,7 @@ def main() -> None:
 
     mcp = FastMCP(
         "handover",
-        version=__version__,
-        description=(
+        instructions=(
             "Parse an AI chat export (Claude, ChatGPT, Gemini, Perplexity) and "
             "generate CLAUDE.md + PLAN.md or other agent context files."
         ),
