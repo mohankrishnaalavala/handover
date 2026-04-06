@@ -3,12 +3,14 @@
  *
  * Two buttons:
  *   btn-export   → "Export Chat as JSON"
- *                  Calls background {action:"export"} → downloads handover-chat-<uuid>.json
+ *                  Claude.ai only — calls background {action:"export"} → downloads
+ *                  handover-chat-<uuid>.json via claude.ai API
  *                  Shows: filename + CLI command to run locally
  *
- *   btn-handover → "Send to Claude Code" (requires handover serve)
+ *   btn-handover → "Generate handover artifacts" (requires handover serve)
+ *                  Supported on claude.ai and chatgpt.com / chat.openai.com
  *                  Calls background {action:"handover"} → POSTs to local server
- *                  Shows: path of generated CLAUDE.md
+ *                  Shows: path of generated artifacts
  */
 
 "use strict";
@@ -50,13 +52,19 @@ async function getActiveTab() {
   return tab || null;
 }
 
-/** Return true if the URL is a supported chat page. */
+/** Return true if the URL is a Claude.ai conversation page (export-capable). */
+function isClaudeAiPage(url) {
+  if (!url) return false;
+  return url.includes("claude.ai/chat/") || url.includes("claude.ai/project/");
+}
+
+/** Return true if the URL is any supported chat page (for live handover). */
 function isSupportedPage(url) {
   if (!url) return false;
   return (
-    url.includes("claude.ai/chat/") ||
-    url.includes("claude.ai/project/") ||
-    url.includes("chat.openai.com/")
+    isClaudeAiPage(url) ||
+    url.includes("chat.openai.com/") ||
+    url.includes("chatgpt.com/c/")
   );
 }
 
@@ -70,7 +78,7 @@ chrome.storage.local.get([STORAGE_PORT_KEY, STORAGE_OUTPUT_KEY], (items) => {
 outputDirInput.addEventListener("change", saveSettings);
 portInput.addEventListener("change", saveSettings);
 
-// ─── Export Chat as JSON ──────────────────────────────────────────────────────
+// ─── Export Chat as JSON (claude.ai only) ────────────────────────────────────
 
 btnExport.addEventListener("click", async () => {
   setLoading(btnExport, true, "Export Chat as JSON");
@@ -82,10 +90,10 @@ btnExport.addEventListener("click", async () => {
       showStatus(statusExport, "Could not determine active tab.", "error");
       return;
     }
-    if (!isSupportedPage(tab.url)) {
+    if (!isClaudeAiPage(tab.url)) {
       showStatus(
         statusExport,
-        "Navigate to a claude.ai/chat/ page first.",
+        "Export as JSON requires a claude.ai conversation. Use 'Generate handover artifacts' for ChatGPT.",
         "error"
       );
       return;
@@ -132,11 +140,11 @@ btnExport.addEventListener("click", async () => {
   }
 });
 
-// ─── Send to Claude Code (live pipeline) ─────────────────────────────────────
+// ─── Generate handover artifacts (live pipeline) ──────────────────────────────
 
 btnHandover.addEventListener("click", async () => {
   saveSettings();
-  setLoading(btnHandover, true, "Send to Claude Code");
+  setLoading(btnHandover, true, "Generate handover artifacts");
   showStatus(statusHandover, "Extracting conversation…", "info");
 
   try {
@@ -148,7 +156,7 @@ btnHandover.addEventListener("click", async () => {
     if (!isSupportedPage(tab.url)) {
       showStatus(
         statusHandover,
-        "Navigate to a claude.ai or chat.openai.com page first.",
+        "Navigate to a claude.ai or chatgpt.com conversation first.",
         "error"
       );
       return;
@@ -172,7 +180,7 @@ btnHandover.addEventListener("click", async () => {
     if (response.success) {
       showStatus(
         statusHandover,
-        `Done — CLAUDE.md written to ${response.result.claude_md}`,
+        `Done — artifacts written to ${response.result.output_dir || response.result.claude_md || "output directory"}`,
         "success"
       );
     } else {
@@ -181,6 +189,6 @@ btnHandover.addEventListener("click", async () => {
   } catch (err) {
     showStatus(statusHandover, err.message || "Unexpected error.", "error");
   } finally {
-    setLoading(btnHandover, false, "Send to Claude Code");
+    setLoading(btnHandover, false, "Generate handover artifacts");
   }
 });

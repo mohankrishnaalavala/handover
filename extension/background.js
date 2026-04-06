@@ -115,10 +115,8 @@ async function postToServer(port, outputDir, payload) {
   return data;
 }
 
-async function handleHandover(tabId) {
-  const { port, outputDir } = await getConfig();
+async function handleHandover(tabId, port, outputDir) {
   const payload = await sendToTab(tabId, { action: "extract" });
-
   return postToServer(port, outputDir, payload);
 }
 
@@ -135,21 +133,24 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   }
 
   if (action === "handover") {
-    handleHandover(tabId)
-      .then((result) => sendResponse({ success: true, result }))
-      .catch((err) => {
-        const message = err instanceof Error ? err.message : String(err);
-        const isServerDown =
-          message.includes("Failed to fetch") ||
-          message.includes("NetworkError") ||
-          message.includes("ECONNREFUSED");
-        sendResponse({
-          success: false,
-          error: isServerDown
-            ? `Cannot reach handover server on port ${DEFAULT_PORT}. Run: handover serve`
-            : message,
+    // Fetch config first so the configured port is in scope for the error message
+    getConfig().then(({ port, outputDir }) => {
+      handleHandover(tabId, port, outputDir)
+        .then((result) => sendResponse({ success: true, result }))
+        .catch((err) => {
+          const message = err instanceof Error ? err.message : String(err);
+          const isServerDown =
+            message.includes("Failed to fetch") ||
+            message.includes("NetworkError") ||
+            message.includes("ECONNREFUSED");
+          sendResponse({
+            success: false,
+            error: isServerDown
+              ? `Cannot reach handover server on port ${port}. Run: handover serve`
+              : message,
+          });
         });
-      });
+    });
     return true;
   }
 
