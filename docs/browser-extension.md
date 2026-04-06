@@ -11,7 +11,7 @@ The **handover** browser extension lets you send any AI chat conversation to you
 
 | Feature | claude.ai | chatgpt.com |
 |---------|-----------|-------------|
-| **Export Chat as JSON** (download for offline use) | ✅ Uses claude.ai API | ❌ Not supported — use CLI import instead |
+| **Export Chat as JSON** (download for offline use) | ✅ Uses claude.ai API | ✅ Uses ChatGPT internal API |
 | **Generate handover artifacts** (live pipeline via `handover serve`) | ✅ | ✅ |
 
 > Gemini and Perplexity export parsing is supported by the **CLI** (`handover --input export.json`), but live browser extraction for those sites is not yet implemented in the extension.
@@ -110,9 +110,9 @@ The popup shows:
 - `Done — artifacts written to <path>` on success
 - An error message if the server is not running or extraction failed
 
-### Export Chat as JSON (claude.ai only)
+### Export Chat as JSON (claude.ai and chatgpt.com)
 
-1. Navigate to a conversation on **claude.ai**
+1. Navigate to a conversation on **claude.ai** or **chatgpt.com**
 2. Click the **handover** toolbar icon
 3. Click **Export Chat as JSON**
 
@@ -121,8 +121,6 @@ The file downloads as `handover-chat-<uuid>.json`. Then run locally:
 ```bash
 handover --input ~/Downloads/handover-chat-<uuid>.json --output ./my-project/ --no-llm
 ```
-
-This is the recommended workflow for ChatGPT too — export from the ChatGPT web UI (Settings → Data Controls → Export Data), then pass the file to the CLI.
 
 ---
 

@@ -90,10 +90,10 @@ btnExport.addEventListener("click", async () => {
       showStatus(statusExport, "Could not determine active tab.", "error");
       return;
     }
-    if (!isClaudeAiPage(tab.url)) {
+    if (!isSupportedPage(tab.url)) {
       showStatus(
         statusExport,
-        "Export as JSON requires a claude.ai conversation. Use 'Generate handover artifacts' for ChatGPT.",
+        "Navigate to a claude.ai or chatgpt.com conversation first.",
         "error"
       );
       return;
