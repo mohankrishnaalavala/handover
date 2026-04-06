@@ -148,12 +148,14 @@ class HandoverHandler(BaseHTTPRequestHandler):
         tmp_path: Path | None = None
 
         try:
-            # Write conversation data to a temp file for the parser
+            # Write conversation data to a temp file for the parser.
+            # Wrap in a list so ClaudeParser treats it as a single-conversation
+            # JSON export — this preserves name, uuid, and chat_messages.
             suffix = ".json"
             with tempfile.NamedTemporaryFile(
                 mode="w", suffix=suffix, delete=False, encoding="utf-8"
             ) as tmp:
-                json.dump(conversation, tmp)
+                json.dump([conversation], tmp)
                 tmp_path = Path(tmp.name)
 
             parser = get_parser(source)
@@ -167,6 +169,9 @@ class HandoverHandler(BaseHTTPRequestHandler):
 
             context = _summarizer.summarize(messages, use_llm=not no_llm)
             context.source = source
+            context.conversation_title = conversation.get("name", "")
+            context.conversation_id = conversation.get("uuid") or conversation.get("id")
+            context.source_version = "extension-live"
 
             out = Path(output_dir)
             out.mkdir(parents=True, exist_ok=True)
