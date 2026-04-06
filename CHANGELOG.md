@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
-## [Unreleased] — Phase 3 + Phase 4 (v0.3.0)
+## [1.0.0] - 2026-04-06
 
 ### Added
 - `handover serve` — local HTTP bridge for the browser extension (port 7437 = H-A-N-D)
@@ -38,6 +38,27 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - `watchdog>=4.0` optional dependency in `[watch]` extra
 - `docs/reverse-handover.md` — user guide
 
+### Phase 5 additions (multi-target)
+- `--target` flag: `claude-code` (default), `codex`, `aider`, `goose`, `all`
+- Target adapter pattern in `handover/targets/` — mirrors parser adapter pattern
+- Codex CLI target (`AGENTS.md`)
+- Aider target (`.aider.conf.yml`)
+- Goose agent target (`goose-context.json`)
+- `--target all` writes every registered target in one pass
+- `docs/adding-a-target.md` — developer guide for new targets
+
+### Phase 6 additions (ecosystem & developer experience)
+- `handover mcp` — FastMCP server so Claude Code can call handover as a tool
+  (requires `pip install handover[mcp]`)
+- `handover history` — list past runs from `~/.handover/history.jsonl`
+- `handover rerun <id>` — re-run any past handover by history ID
+- `handover merge` — merge multiple chat exports into one unified context
+- `handover pull <gist_url>` — pull shared handover artifacts from a GitHub Gist
+- `--publish` flag — publish generated artifacts to GitHub Gist after writing
+  (requires `gh` CLI authenticated)
+- History recorded automatically after every successful non-dry-run invocation
+- `[mcp]` optional extra: `pip install handover[mcp]`
+
 ## [0.2.0] - 2026-04-05
 
 ### Added
@@ -53,5 +74,5 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - GitHub Actions CI (lint + test matrix on Python 3.11 + 3.12)
 - GitHub Actions release pipeline to TestPyPI and PyPI via Trusted Publisher
 
-[Unreleased]: https://github.com/mohankrishnaalavala/handover/compare/v0.2.0...HEAD
+[1.0.0]: https://github.com/mohankrishnaalavala/handover/compare/v0.2.0...v1.0.0
 [0.2.0]: https://github.com/mohankrishnaalavala/handover/releases/tag/v0.2.0
