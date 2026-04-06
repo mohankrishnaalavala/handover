@@ -63,11 +63,13 @@ Run without --dry-run to write files.
 
 ## Supported Input Formats
 
-| Source | Format | How to Get |
-|--------|--------|------------|
-| Claude.ai bulk export | `.jsonl` (one JSON object per line) | Settings → Privacy → Export Data |
-| Claude.ai single chat | `.json` | Claude Conversation Exporter browser extension |
-| Claude.ai single chat | `.md` | Browser extension (Markdown export) |
+| Source | Format | How to Export |
+|--------|--------|---------------|
+| Claude.ai bulk export | `.jsonl` | Settings → Privacy → Export Data |
+| Claude.ai single chat | `.json` / `.md` | Claude Conversation Exporter browser extension |
+| ChatGPT | `.json` | Settings → Data Controls → Export Data |
+| Gemini | `.json` | Google Takeout → Gemini Apps Activity |
+| Perplexity | `.json` | Settings → Account → Export Data |
 
 ---
 
@@ -88,12 +90,13 @@ handover init                               # scaffold customizable templates to
 
 ## Roadmap
 
-| Phase | Source | Target | Status |
-|-------|--------|--------|--------|
-| 1 | Claude chat | Claude Code | **This release** |
-| 2 | ChatGPT, Gemini, Perplexity | Claude Code | Open contribution path |
-| 3 | Claude Code sessions (`~/.claude/projects/`) | Claude chat | High value — spec next |
-| 4 | Any chat | Codex CLI, Aider, Goose | Future |
+| Version | Phase | What ships |
+|---------|-------|------------|
+| v0.2.0 | 1 + 2 | Claude, ChatGPT, Gemini, Perplexity → Claude Code | ✅ Released |
+| v0.3.0 | 3 | `handover serve` local bridge + Chrome/Firefox extension | In development |
+| v0.4.0 | 4 | Reverse handover — Claude Code sessions → `HANDOVER.md` | Planned |
+| v0.5.0 | 5 | Multi-target: Codex CLI, Aider, Goose | Planned |
+| v1.0.0 | 6 | MCP server, VS Code extension, `handover history`, `handover merge` | Future |
 
 ---
 
@@ -102,12 +105,6 @@ handover init                               # scaffold customizable templates to
 The primary contribution path is adding a new source adapter. Each adapter is an isolated Python class anyone can own end-to-end. See [docs/adding-an-adapter.md](docs/adding-an-adapter.md) for the step-by-step guide.
 
 For general contribution guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md).
-
----
-
-## Full PRD
-
-The complete Product Requirements Document is available at [handover-prd-v2.md](handover-prd-v2.md).
 
 ---
 

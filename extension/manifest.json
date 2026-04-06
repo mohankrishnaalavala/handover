@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "handover",
+  "version": "0.3.0",
+  "description": "Send any AI chat to your local Claude Code agent — zero context lost.",
+
+  "permissions": ["activeTab", "storage", "notifications"],
+  "host_permissions": [
+    "https://claude.ai/*",
+    "https://chat.openai.com/*",
+    "http://localhost:7437/*"
+  ],
+
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "handover"
+  },
+
+  "background": {
+    "service_worker": "background.js"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["https://claude.ai/*"],
+      "js": ["content/claude.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://chat.openai.com/*"],
+      "js": ["content/chatgpt.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
