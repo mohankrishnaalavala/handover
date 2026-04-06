@@ -125,7 +125,7 @@ def main() -> None:
         ),
     )
 
-    @mcp.tool()  # type: ignore[untyped-decorator]
+    @mcp.tool()
     def run_handover(
         input_file: str,
         output_dir: str = ".",
