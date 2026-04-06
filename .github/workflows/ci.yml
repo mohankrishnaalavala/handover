@@ -15,7 +15,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install dev dependencies
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev,watch]"
       - name: Ruff lint
         run: ruff check handover/ tests/
       - name: Ruff format check
