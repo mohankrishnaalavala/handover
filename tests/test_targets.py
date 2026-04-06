@@ -376,8 +376,10 @@ class TestCLITargetFlag:
         result = runner.invoke(
             main,
             [
-                "--input", str(FIXTURES / "claude_single.json"),
-                "--output", str(tmp_path),
+                "--input",
+                str(FIXTURES / "claude_single.json"),
+                "--output",
+                str(tmp_path),
                 "--no-llm",
             ],
         )
@@ -390,10 +392,13 @@ class TestCLITargetFlag:
         result = runner.invoke(
             main,
             [
-                "--input", str(FIXTURES / "claude_single.json"),
-                "--output", str(tmp_path),
+                "--input",
+                str(FIXTURES / "claude_single.json"),
+                "--output",
+                str(tmp_path),
                 "--no-llm",
-                "--target", "codex",
+                "--target",
+                "codex",
             ],
         )
         assert result.exit_code == 0, result.output
@@ -404,10 +409,13 @@ class TestCLITargetFlag:
         result = runner.invoke(
             main,
             [
-                "--input", str(FIXTURES / "claude_single.json"),
-                "--output", str(tmp_path),
+                "--input",
+                str(FIXTURES / "claude_single.json"),
+                "--output",
+                str(tmp_path),
                 "--no-llm",
-                "--target", "aider",
+                "--target",
+                "aider",
             ],
         )
         assert result.exit_code == 0, result.output
@@ -418,10 +426,13 @@ class TestCLITargetFlag:
         result = runner.invoke(
             main,
             [
-                "--input", str(FIXTURES / "claude_single.json"),
-                "--output", str(tmp_path),
+                "--input",
+                str(FIXTURES / "claude_single.json"),
+                "--output",
+                str(tmp_path),
                 "--no-llm",
-                "--target", "goose",
+                "--target",
+                "goose",
             ],
         )
         assert result.exit_code == 0, result.output
@@ -432,10 +443,13 @@ class TestCLITargetFlag:
         result = runner.invoke(
             main,
             [
-                "--input", str(FIXTURES / "claude_single.json"),
-                "--output", str(tmp_path),
+                "--input",
+                str(FIXTURES / "claude_single.json"),
+                "--output",
+                str(tmp_path),
                 "--no-llm",
-                "--target", "all",
+                "--target",
+                "all",
             ],
         )
         assert result.exit_code == 0, result.output
@@ -449,11 +463,14 @@ class TestCLITargetFlag:
         result = runner.invoke(
             main,
             [
-                "--input", str(FIXTURES / "claude_single.json"),
-                "--output", str(tmp_path),
+                "--input",
+                str(FIXTURES / "claude_single.json"),
+                "--output",
+                str(tmp_path),
                 "--no-llm",
                 "--dry-run",
-                "--target", "claude-code",
+                "--target",
+                "claude-code",
             ],
         )
         assert result.exit_code == 0, result.output
@@ -465,11 +482,14 @@ class TestCLITargetFlag:
         result = runner.invoke(
             main,
             [
-                "--input", str(FIXTURES / "claude_single.json"),
-                "--output", str(tmp_path),
+                "--input",
+                str(FIXTURES / "claude_single.json"),
+                "--output",
+                str(tmp_path),
                 "--no-llm",
                 "--dry-run",
-                "--target", "codex",
+                "--target",
+                "codex",
             ],
         )
         assert result.exit_code == 0, result.output
@@ -481,11 +501,14 @@ class TestCLITargetFlag:
         result = runner.invoke(
             main,
             [
-                "--input", str(FIXTURES / "claude_single.json"),
-                "--output", str(tmp_path),
+                "--input",
+                str(FIXTURES / "claude_single.json"),
+                "--output",
+                str(tmp_path),
                 "--no-llm",
                 "--dry-run",
-                "--target", "all",
+                "--target",
+                "all",
             ],
         )
         assert result.exit_code == 0, result.output
@@ -503,10 +526,13 @@ class TestCLITargetFlag:
         result = runner.invoke(
             main,
             [
-                "--input", str(FIXTURES / "claude_single.json"),
-                "--output", str(tmp_path),
+                "--input",
+                str(FIXTURES / "claude_single.json"),
+                "--output",
+                str(tmp_path),
                 "--no-llm",
-                "--target", "codex",
+                "--target",
+                "codex",
             ],
         )
         assert "AGENTS.md" in result.output
@@ -516,10 +542,13 @@ class TestCLITargetFlag:
         result = runner.invoke(
             main,
             [
-                "--input", str(FIXTURES / "claude_single.json"),
-                "--output", str(tmp_path),
+                "--input",
+                str(FIXTURES / "claude_single.json"),
+                "--output",
+                str(tmp_path),
                 "--no-llm",
-                "--target", "not-a-real-agent",
+                "--target",
+                "not-a-real-agent",
             ],
         )
         assert result.exit_code != 0

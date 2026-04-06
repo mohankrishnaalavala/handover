@@ -47,8 +47,7 @@ def get_target(name: str) -> BaseTarget:
     """
     if name not in TARGET_REGISTRY:
         raise ValueError(
-            f"No target registered for '{name}'. "
-            f"Available targets: {sorted(TARGET_REGISTRY)}"
+            f"No target registered for '{name}'. Available targets: {sorted(TARGET_REGISTRY)}"
         )
     return TARGET_REGISTRY[name]()
 
