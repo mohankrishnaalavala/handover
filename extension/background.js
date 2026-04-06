@@ -42,12 +42,11 @@ function sendToTab(tabId, message) {
   return new Promise((resolve, reject) => {
     chrome.tabs.sendMessage(tabId, message, (response) => {
       if (chrome.runtime.lastError) {
-        reject(
-          new Error(
-            chrome.runtime.lastError.message ||
-              "Could not contact content script. Refresh the page and try again."
-          )
-        );
+        const rawMsg = chrome.runtime.lastError.message || "";
+        const msg = rawMsg.includes("Receiving end does not exist")
+          ? "Content script not found — please refresh the tab and try again."
+          : rawMsg || "Could not contact content script. Refresh the page and try again.";
+        reject(new Error(msg));
         return;
       }
       if (!response || !response.success) {
