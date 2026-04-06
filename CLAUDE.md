@@ -4,8 +4,8 @@
 CLI tool that parses AI chat exports and generates CLAUDE.md + PLAN.md
 artifacts for local terminal agents to ingest.
 
-**Current state:** v0.5.0 — Phases 1–5 complete.  
-**Active branch:** Phase 5 — multi-target agent output (`--target` flag).
+**Current state:** v1.0.0 — Phases 1–6 complete (skipping 6.2 VS Code extension and 6.5 GitHub Action).  
+**Active branch:** Phase 6 — ecosystem & developer experience.
 
 ## Tech Stack
 - Language: Python 3.11+
@@ -35,6 +35,11 @@ artifacts for local terminal agents to ingest.
 - **Phase 5:** `ClaudeCodeTarget` delegates to `Generator` — do not duplicate Jinja2 rendering logic in targets.
 - **Phase 5:** `--target all` iterates `list_targets()` — every registered target generates output into the same `--output` directory.
 - **Phase 5:** Non-claude-code targets (codex, aider, goose) use stdlib only — no new core dependencies. Write YAML/JSON via string templates or `json.dumps()`.
+- **Phase 6:** `handover/history.py` writes one JSON line per run to `~/.handover/history.jsonl` after every successful non-dry-run `handover` invocation.
+- **Phase 6:** `handover/merger.py` combines multiple HandoverContext objects. No-LLM mode uses heuristic deduplication; LLM mode calls `summarizer.merge_contexts_with_llm()`.
+- **Phase 6:** `handover/publisher.py` uses `gh gist create` subprocess — requires `gh` CLI authenticated. No new core Python dependency.
+- **Phase 6:** `handover/mcp_server.py` uses `FastMCP` from `mcp>=1.0` (optional `[mcp]` extra). Import `mcp` only inside `mcp_server.py`; the CLI subcommand catches ImportError.
+- **Phase 6:** New CLI subcommands: `mcp`, `history`, `rerun`, `merge`, `pull`. New flag: `--publish` on main command.
 
 ## Coding Standards
 - Type hints on all functions and methods

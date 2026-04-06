@@ -57,6 +57,88 @@ Conversation:
 {conversation}"""
 
 
+def merge_contexts_with_llm(
+    contexts: list[HandoverContext],
+) -> HandoverContext:
+    """
+    Use Claude to intelligently merge multiple HandoverContext objects.
+
+    Sends all contexts as serialized JSON summaries and asks the model to
+    produce a single unified context following the merge rules in the prompt.
+
+    Args:
+        contexts: Two or more HandoverContext objects to merge.
+
+    Returns:
+        A single merged HandoverContext.
+
+    Raises:
+        HandoverAPIError: If the API call fails.
+    """
+    from handover.merger import MERGE_PROMPT, _context_to_summary
+
+    summaries_text = "\n\n".join(
+        f"Session {i + 1}:\n{_context_to_summary(ctx)}" for i, ctx in enumerate(contexts)
+    )
+    prompt = MERGE_PROMPT.format(n=len(contexts), summaries=summaries_text)
+
+    try:
+        client = anthropic.Anthropic()
+        response = client.messages.create(
+            model=_MODEL,
+            max_tokens=4096,
+            messages=[{"role": "user", "content": prompt}],
+        )
+    except anthropic.AuthenticationError as e:
+        raise HandoverAPIError(
+            "ANTHROPIC_API_KEY is not set or invalid. Use --no-llm for the merge."
+        ) from e
+    except anthropic.APIError as e:
+        raise HandoverAPIError(f"Anthropic API error during merge: {e}.") from e
+
+    raw_text = getattr(response.content[0], "text", None)
+    if not isinstance(raw_text, str):
+        raise HandoverAPIError("Unexpected response block type from API during merge.")
+
+    stripped = raw_text.strip()
+    if stripped.startswith("```"):
+        lines = stripped.splitlines()
+        stripped = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+
+    try:
+        raw = json.loads(stripped)
+    except json.JSONDecodeError as e:
+        raise HandoverAPIError(f"Model returned invalid JSON during merge: {e}.") from e
+
+    return HandoverContext(
+        schema_version="1.0",
+        source="merged",
+        extracted_at=datetime.datetime.utcnow().isoformat() + "Z",
+        goal=raw.get("goal", ""),
+        tech_stack=raw.get("tech_stack", {}),
+        decisions=[
+            Decision(
+                topic=d.get("topic", ""),
+                decision=d.get("decision", ""),
+                rationale=d.get("rationale", ""),
+            )
+            for d in raw.get("decisions", [])
+        ],
+        tasks=[
+            Task(
+                title=t.get("title", ""),
+                description=t.get("description", ""),
+                priority=t.get("priority", "medium"),
+                done=t.get("done", False),
+            )
+            for t in raw.get("tasks", [])
+        ],
+        constraints=raw.get("constraints", []),
+        non_goals=raw.get("non_goals", []),
+        open_questions=raw.get("open_questions", []),
+    )
+
+
 def summarize(
     messages: list[ConversationMessage],
     use_llm: bool = True,

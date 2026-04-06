@@ -88,6 +88,26 @@ class HandoverContext:
 
 
 # ---------------------------------------------------------------------------
+# Phase 6 — History log
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class HistoryEntry:
+    """A record of a successful handover run, written to ~/.handover/history.jsonl."""
+
+    handover_id: str  # "h_" + 8-char hex from uuid4
+    timestamp: str  # ISO 8601
+    source: str  # "claude" | "chatgpt" | ...
+    conversation_title: str
+    input_file: str  # absolute path
+    output_dir: str  # absolute path
+    artifacts: list[str]  # filenames written, e.g. ["CLAUDE.md", "PLAN.md"]
+    target: str = "claude-code"
+    use_llm: bool = True
+
+
+# ---------------------------------------------------------------------------
 # Phase 4 — Reverse handover (Claude Code session → HANDOVER.md)
 # ---------------------------------------------------------------------------
 
