@@ -78,7 +78,14 @@ from handover import __version__
     "--template",
     type=click.Path(),
     default=None,
-    help="Path to custom Jinja2 templates directory",
+    help="Path to custom Jinja2 templates directory (claude-code target only)",
+)
+@click.option(
+    "--target",
+    type=click.Choice(["claude-code", "codex", "aider", "goose", "all"]),
+    default="claude-code",
+    show_default=True,
+    help="Output target format. 'all' writes every format.",
 )
 @click.version_option(version=__version__, prog_name="handover")
 def main(
@@ -92,22 +99,25 @@ def main(
     no_llm: bool,
     launch: bool,
     template: str | None,
+    target: str,
 ) -> None:
     """
     handover — Universal AI Chat to Local Agent Handover Tool.
 
     Design in chat. Build in terminal. Zero context lost.
 
-    Parse a Claude chat export and generate CLAUDE.md + PLAN.md for
-    immediate use with Claude Code or another terminal agent.
+    Parse a chat export and generate context files for your terminal coding agent.
+    Supports Claude Code (default), Codex, aider, and Goose output formats.
 
     Examples:
 
       handover --input chat.json --output ./my-project/
 
+      handover --input chat.json --output ./my-project/ --target codex
+
       handover --input export.jsonl --title "API Design" --output ./my-project/
 
-      handover --input chat.json --dry-run
+      handover --input chat.json --output ./my-project/ --target all --dry-run
     """
     if ctx.invoked_subcommand is not None:
         return
@@ -201,13 +211,20 @@ def main(
                 pass
 
     # Generate artifacts
-    from handover.generator import Generator
+    from handover.targets import get_target, list_targets
+    from handover.targets.base import BaseTarget
+    from handover.targets.claude_code import ClaudeCodeTarget
 
     template_dir = Path(template) if template else None
-    gen = Generator(template_dir=template_dir)
+    targets_to_run: list[str] = list_targets() if target == "all" else [target]
+
+    def _make_target(t_name: str) -> BaseTarget:
+        """Instantiate a target, applying template_dir to ClaudeCodeTarget."""
+        if t_name == "claude-code":
+            return ClaudeCodeTarget(template_dir=template_dir)
+        return get_target(t_name)
 
     if dry_run:
-        result = gen.generate(context, output_path, dry_run=True)
         click.echo(f"\nParsing: {context.conversation_title or input_path.name!r}")
         click.echo(f"  Source : {source} ({fmt_version})")
         click.echo(f"  Messages: {len(messages)}")
@@ -218,14 +235,18 @@ def main(
         click.echo(f"  Tasks      : {len(context.tasks)}")
         click.echo(f"  Constraints: {len(context.constraints)}")
         click.echo(f"  Questions  : {len(context.open_questions)}")
-        click.echo(f"\nWould write to {output_path}/:")
-        for filename, content in result.items():
-            size_kb = len(content.encode()) / 1024
-            click.echo(f"  -> {filename}  ({size_kb:.1f} KB)")
+        click.echo(f"\nTarget: {target}  |  Would write to {output_path}/:")
+        for t_name in targets_to_run:
+            paths = _make_target(t_name).generate(context, output_path, dry_run=True)
+            for p in paths:
+                click.echo(f"  -> {p.name}")
         click.echo("\nRun without --dry-run to write files.")
     else:
-        gen.generate(context, output_path, dry_run=False)
-        click.echo(f"Wrote CLAUDE.md and PLAN.md to {output_path}/")
+        all_paths: list[Path] = []
+        for t_name in targets_to_run:
+            all_paths.extend(_make_target(t_name).generate(context, output_path, dry_run=False))
+        names = ", ".join(p.name for p in all_paths)
+        click.echo(f"Wrote {names} to {output_path}/")
 
     # --launch: open claude in output directory
     if launch and not dry_run:
