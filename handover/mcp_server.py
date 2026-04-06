@@ -30,8 +30,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from handover import __version__
-
 
 def run_handover_impl(
     input_file: str,
