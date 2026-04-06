@@ -28,7 +28,7 @@ artifacts for local terminal agents to ingest.
 - **Phase 3:** `handover/server.py` is the HTTP bridge. All responses must include CORS headers (`Access-Control-Allow-Origin: *`). Port 7437 (H-A-N-D) is the default.
 - **Phase 3:** The browser extension lives in `extension/` (MV3). Content scripts extract DOM messages; `background.js` POSTs to the local server. Keep extension JS dependency-free (no bundler required).
 - **Phase 3:** Daemon mode in `handover serve --daemon` spawns a subprocess via `python -m handover serve` and writes PID to `~/.handover/server.pid`.
-- **Phase 4:** Session logs live at `~/.claude/projects/<hash>/<session-id>.jsonl`. The project hash is the absolute path with all `/` replaced by `-`.
+- **Phase 4:** Session logs live at `~/.claude/projects/<hash>/<session-id>.jsonl`. The project hash is the absolute path with all `/` and `_` replaced by `-`.
 - **Phase 4:** `reverse.py` orchestrates: parse → extract file changes + commands → match PLAN.md tasks → LLM/heuristic decisions + next steps → `Generator.generate_handover()`.
 - **Phase 4:** `watcher.py` uses `watchdog` with a debounce timer (default 60 s). Requires `pip install handover[watch]`. Never import `watchdog` at module level — import lazily inside `start_watching()` so the rest of the package works without the optional dep.
 
