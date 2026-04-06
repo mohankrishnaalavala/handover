@@ -195,9 +195,7 @@ def test_handover_sets_source_on_context(server: Any, tmp_path: Path) -> None:
     assert mock_context.source == "chatgpt"
 
 
-def test_handover_chatgpt_chat_messages_uses_claude_parser(
-    server: Any, tmp_path: Path
-) -> None:
+def test_handover_chatgpt_chat_messages_uses_claude_parser(server: Any, tmp_path: Path) -> None:
     """Extension sends chatgpt source with pre-processed chat_messages format.
     Server must use ClaudeParser (not ChatGPTParser) to avoid 'mapping' error."""
     _, port = server
