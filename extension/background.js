@@ -42,12 +42,11 @@ function sendToTab(tabId, message) {
   return new Promise((resolve, reject) => {
     chrome.tabs.sendMessage(tabId, message, (response) => {
       if (chrome.runtime.lastError) {
-        reject(
-          new Error(
-            chrome.runtime.lastError.message ||
-              "Could not contact content script. Refresh the page and try again."
-          )
-        );
+        const rawMsg = chrome.runtime.lastError.message || "";
+        const msg = rawMsg.includes("Receiving end does not exist")
+          ? "Content script not found — please refresh the tab and try again."
+          : rawMsg || "Could not contact content script. Refresh the page and try again.";
+        reject(new Error(msg));
         return;
       }
       if (!response || !response.success) {
@@ -115,10 +114,8 @@ async function postToServer(port, outputDir, payload) {
   return data;
 }
 
-async function handleHandover(tabId) {
-  const { port, outputDir } = await getConfig();
+async function handleHandover(tabId, port, outputDir) {
   const payload = await sendToTab(tabId, { action: "extract" });
-
   return postToServer(port, outputDir, payload);
 }
 
@@ -135,21 +132,24 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   }
 
   if (action === "handover") {
-    handleHandover(tabId)
-      .then((result) => sendResponse({ success: true, result }))
-      .catch((err) => {
-        const message = err instanceof Error ? err.message : String(err);
-        const isServerDown =
-          message.includes("Failed to fetch") ||
-          message.includes("NetworkError") ||
-          message.includes("ECONNREFUSED");
-        sendResponse({
-          success: false,
-          error: isServerDown
-            ? `Cannot reach handover server on port ${DEFAULT_PORT}. Run: handover serve`
-            : message,
+    // Fetch config first so the configured port is in scope for the error message
+    getConfig().then(({ port, outputDir }) => {
+      handleHandover(tabId, port, outputDir)
+        .then((result) => sendResponse({ success: true, result }))
+        .catch((err) => {
+          const message = err instanceof Error ? err.message : String(err);
+          const isServerDown =
+            message.includes("Failed to fetch") ||
+            message.includes("NetworkError") ||
+            message.includes("ECONNREFUSED");
+          sendResponse({
+            success: false,
+            error: isServerDown
+              ? `Cannot reach handover server on port ${port}. Run: handover serve`
+              : message,
+          });
         });
-      });
+    });
     return true;
   }
 

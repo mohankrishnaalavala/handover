@@ -158,7 +158,13 @@ class HandoverHandler(BaseHTTPRequestHandler):
                 json.dump([conversation], tmp)
                 tmp_path = Path(tmp.name)
 
-            parser = get_parser(source)
+            # chatgpt.js pre-processes API data into claude-compatible format
+            # ({uuid, name, chat_messages}) rather than the native mapping format.
+            # Use ClaudeParser when the extension already did the conversion.
+            parse_as = (
+                "claude" if source == "chatgpt" and "chat_messages" in conversation else source
+            )
+            parser = get_parser(parse_as)
             messages = parser.parse(tmp_path)
 
             if not messages:

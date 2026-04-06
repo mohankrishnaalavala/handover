@@ -195,6 +195,38 @@ def test_handover_sets_source_on_context(server: Any, tmp_path: Path) -> None:
     assert mock_context.source == "chatgpt"
 
 
+def test_handover_chatgpt_chat_messages_uses_claude_parser(server: Any, tmp_path: Path) -> None:
+    """Extension sends chatgpt source with pre-processed chat_messages format.
+    Server must use ClaudeParser (not ChatGPTParser) to avoid 'mapping' error."""
+    _, port = server
+    _post(port, "/config", {"output_dir": str(tmp_path), "no_llm": True})
+
+    mock_context = MagicMock()
+    mock_context.source = ""
+
+    with (
+        patch("handover.server.get_parser") as mock_get_parser,
+        patch("handover.server._summarizer.summarize", return_value=mock_context),
+        patch("handover.server.Generator") as mock_gen_cls,
+    ):
+        mock_parser = MagicMock()
+        mock_parser.parse.return_value = [MagicMock()]
+        mock_get_parser.return_value = mock_parser
+        mock_gen_cls.return_value = MagicMock()
+
+        status, data = _post(
+            port,
+            "/handover",
+            {"source": "chatgpt", "conversation": _mock_conversation()},
+        )
+
+    assert status == 200
+    # Parser must be requested as "claude" because extension pre-processed the data
+    mock_get_parser.assert_called_once_with("claude")
+    # But the source label on the context stays "chatgpt"
+    assert mock_context.source == "chatgpt"
+
+
 # ---------------------------------------------------------------------------
 # /handover — error paths
 # ---------------------------------------------------------------------------

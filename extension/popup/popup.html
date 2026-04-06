@@ -12,7 +12,7 @@
     <span class="tagline">Design in chat. Build in terminal.</span>
   </div>
 
-  <!-- ── Primary action: export JSON ─────────────────────────────────── -->
+  <!-- ── Primary action: export JSON (claude.ai only) ────────────────── -->
   <button id="btn-export" class="primary">
     Export Chat as JSON
   </button>
@@ -20,7 +20,7 @@
   <div id="status-export" class="status hidden"></div>
 
   <div class="divider">
-    <span>or send to local server</span>
+    <span>or send to local agent</span>
   </div>
 
   <!-- ── Secondary action: live pipeline ─────────────────────────────── -->
@@ -40,13 +40,13 @@
   </div>
 
   <button id="btn-handover" class="secondary">
-    Send to Claude Code
+    Generate handover artifacts
   </button>
 
   <div id="status-handover" class="status hidden"></div>
 
   <div class="footer">
-    <span>Send requires <code>handover serve</code> running locally</span>
+    <span>Requires <code>handover serve</code> running locally</span>
   </div>
 
   <script src="popup.js"></script>
