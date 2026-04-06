@@ -4,8 +4,8 @@
 CLI tool that parses AI chat exports and generates CLAUDE.md + PLAN.md
 artifacts for local terminal agents to ingest.
 
-**Current state:** v0.2.0 released — Phase 1 (Claude) + Phase 2 (ChatGPT, Gemini, Perplexity) complete.  
-**Active branch:** Phase 3 + Phase 4 — `handover serve`, browser extension, and reverse handover.
+**Current state:** v0.5.0 — Phases 1–5 complete.  
+**Active branch:** Phase 5 — multi-target agent output (`--target` flag).
 
 ## Tech Stack
 - Language: Python 3.11+
@@ -31,6 +31,10 @@ artifacts for local terminal agents to ingest.
 - **Phase 4:** Session logs live at `~/.claude/projects/<hash>/<session-id>.jsonl`. The project hash is the absolute path with all `/` and `_` replaced by `-`.
 - **Phase 4:** `reverse.py` orchestrates: parse → extract file changes + commands → match PLAN.md tasks → LLM/heuristic decisions + next steps → `Generator.generate_handover()`.
 - **Phase 4:** `watcher.py` uses `watchdog` with a debounce timer (default 60 s). Requires `pip install handover[watch]`. Never import `watchdog` at module level — import lazily inside `start_watching()` so the rest of the package works without the optional dep.
+- **Phase 5:** Target adapters live in `handover/targets/`. Each target subclasses `BaseTarget` (in `targets/base.py`) and registers in `TARGET_REGISTRY` in `targets/__init__.py`. Mirrors the source adapter pattern in `parsers/`.
+- **Phase 5:** `ClaudeCodeTarget` delegates to `Generator` — do not duplicate Jinja2 rendering logic in targets.
+- **Phase 5:** `--target all` iterates `list_targets()` — every registered target generates output into the same `--output` directory.
+- **Phase 5:** Non-claude-code targets (codex, aider, goose) use stdlib only — no new core dependencies. Write YAML/JSON via string templates or `json.dumps()`.
 
 ## Coding Standards
 - Type hints on all functions and methods

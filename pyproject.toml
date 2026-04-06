@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "handover"
-version = "0.2.0"
+version = "0.5.0"
 description = "Universal AI chat to local agent handover tool"
 readme = "README.md"
 license = { text = "MIT" }
