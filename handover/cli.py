@@ -87,6 +87,12 @@ from handover import __version__
     show_default=True,
     help="Output target format. 'all' writes every format.",
 )
+@click.option(
+    "--publish",
+    is_flag=True,
+    default=False,
+    help="Publish generated artifacts to a GitHub Gist after writing (requires gh CLI).",
+)
 @click.version_option(version=__version__, prog_name="handover")
 def main(
     ctx: click.Context,
@@ -100,6 +106,7 @@ def main(
     launch: bool,
     template: str | None,
     target: str,
+    publish: bool,
 ) -> None:
     """
     handover — Universal AI Chat to Local Agent Handover Tool.
@@ -247,6 +254,42 @@ def main(
             all_paths.extend(_make_target(t_name).generate(context, output_path, dry_run=False))
         names = ", ".join(p.name for p in all_paths)
         click.echo(f"Wrote {names} to {output_path}/")
+
+        # Record to history
+        from handover.history import make_id, now_iso, record
+        from handover.models import HistoryEntry
+
+        entry = HistoryEntry(
+            handover_id=make_id(),
+            timestamp=now_iso(),
+            source=source,
+            conversation_title=context.conversation_title,
+            input_file=str(input_path.resolve()),
+            output_dir=str(output_path.resolve()),
+            artifacts=[p.name for p in all_paths],
+            target=target,
+            use_llm=not no_llm,
+        )
+        record(entry)
+        click.echo(f"History: {entry.handover_id}")
+
+        # --publish: create a GitHub Gist
+        if publish:
+            from handover.publisher import PublisherError
+            from handover.publisher import publish as _publish
+
+            file_contents = {
+                p.name: p.read_text(encoding="utf-8")
+                for p in all_paths
+                if p.suffix in {".md", ".yml", ".yaml", ".json"}
+            }
+            desc = f"handover: {context.conversation_title or input_path.name}"
+            try:
+                gist_url = _publish(file_contents, description=desc)
+                click.echo(f"Published  → {gist_url}")
+                click.echo(f"Pull later : handover pull {gist_url}")
+            except PublisherError as e:
+                click.echo(f"Warning: publish failed — {e}", err=True)
 
     # --launch: open claude in output directory
     if launch and not dry_run:
@@ -695,3 +738,289 @@ def watch_sessions(
         no_llm=no_llm,
         idle_seconds=idle,
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 6 — Ecosystem & Developer Experience
+# ---------------------------------------------------------------------------
+
+
+@main.command("mcp")
+def run_mcp_server() -> None:
+    """
+    Start the MCP server so Claude Code can call handover as a tool.
+
+    Requires the optional [mcp] dependency:
+      pip install handover[mcp]
+
+    Add to ~/.claude/mcp.json:
+      {
+        "mcpServers": {
+          "handover": {
+            "command": "handover",
+            "args": ["mcp"],
+            "env": { "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}" }
+          }
+        }
+      }
+
+    Example:
+      handover mcp
+    """
+    try:
+        from handover.mcp_server import main as mcp_main
+    except ImportError as exc:
+        raise click.ClickException(
+            "The 'mcp' package is required for `handover mcp`.\n"
+            "Install it with:  pip install handover[mcp]"
+        ) from exc
+
+    mcp_main()
+
+
+@main.command("history")
+@click.option("--limit", default=20, show_default=True, help="Maximum entries to show")
+@click.option(
+    "--project",
+    "-p",
+    "project_dir",
+    type=click.Path(),
+    default=None,
+    help="Filter to handovers whose output directory is inside this path",
+)
+def show_history(limit: int, project_dir: str | None) -> None:
+    """
+    List past handover runs from ~/.handover/history.jsonl.
+
+    Examples:
+
+      handover history
+
+      handover history --limit 50
+
+      handover history --project ~/projects/my-api/
+    """
+    from handover.history import HISTORY_PATH, load
+
+    entries = load(limit=limit, output_dir=project_dir)
+    if not entries:
+        path_info = f" (file: {HISTORY_PATH})" if not HISTORY_PATH.exists() else ""
+        click.echo(f"No handover history found{path_info}.")
+        return
+
+    click.echo(f"\n{'ID':<12}  {'DATE':<12}  {'SOURCE':<12}  {'TARGET':<14}  TITLE")
+    click.echo("-" * 90)
+    for e in entries:
+        date = e.timestamp[:10]
+        title = (e.conversation_title or e.input_file.split("/")[-1])[:40]
+        click.echo(f"{e.handover_id:<12}  {date:<12}  {e.source:<12}  {e.target:<14}  {title}")
+    click.echo(f"\n{len(entries)} entry(s) shown.")
+
+
+@main.command("rerun")
+@click.argument("handover_id")
+def rerun_handover(handover_id: str) -> None:
+    """
+    Re-run a past handover by its ID.
+
+    HANDOVER_ID: The ID shown by `handover history` (e.g. h_3f9a2c1b).
+
+    Example:
+
+      handover rerun h_3f9a2c1b
+    """
+    from handover.history import get_by_id
+
+    entry = get_by_id(handover_id)
+    if entry is None:
+        raise click.ClickException(
+            f"No history entry found for ID '{handover_id}'.\n"
+            "Run `handover history` to list available entries."
+        )
+
+    click.echo(f"Re-running handover {handover_id}: {entry.input_file} → {entry.output_dir}")
+    # Delegate to the main pipeline by invoking the main command programmatically
+    from click.testing import CliRunner
+
+    args = [
+        "--input",
+        entry.input_file,
+        "--output",
+        entry.output_dir,
+        "--target",
+        entry.target,
+    ]
+    if not entry.use_llm:
+        args.append("--no-llm")
+
+    runner = CliRunner(mix_stderr=False)  # type: ignore[call-arg]
+    result = runner.invoke(main, args, catch_exceptions=False)
+    click.echo(result.output)
+    if result.exit_code != 0:
+        raise click.ClickException("Re-run failed. See output above.")
+
+
+@main.command("merge")
+@click.option(
+    "--input",
+    "-i",
+    "input_files",
+    type=click.Path(exists=True),
+    multiple=True,
+    required=True,
+    help="Chat export files to merge (pass multiple times)",
+)
+@click.option(
+    "--output",
+    "-o",
+    "output_dir",
+    type=click.Path(),
+    required=True,
+    help="Directory to write merged output files",
+)
+@click.option(
+    "--source",
+    type=click.Choice(["claude", "chatgpt", "gemini", "perplexity"]),
+    default=None,
+    help="Force a specific parser adapter for all inputs (default: auto-detect)",
+)
+@click.option(
+    "--no-llm",
+    is_flag=True,
+    default=False,
+    help="Use heuristic merge instead of LLM synthesis",
+)
+@click.option(
+    "--target",
+    type=click.Choice(["claude-code", "codex", "aider", "goose", "all"]),
+    default="claude-code",
+    show_default=True,
+    help="Output target format",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Print what would be written without writing files",
+)
+def merge_command(
+    input_files: tuple[str, ...],
+    output_dir: str,
+    source: str | None,
+    no_llm: bool,
+    target: str,
+    dry_run: bool,
+) -> None:
+    """
+    Merge multiple chat exports into one unified context.
+
+    Useful when a design spans multiple separate chat sessions.
+
+    Examples:
+
+      handover merge --input session1.json --input session2.json --output ./project/
+
+      handover merge --input s1.json --input s2.json --output . --no-llm
+    """
+    from handover.merger import merge_contexts
+    from handover.models import HandoverAPIError
+    from handover.parsers import detect_source, get_parser
+    from handover.targets import get_target, list_targets
+    from handover.targets.base import BaseTarget
+    from handover.targets.claude_code import ClaudeCodeTarget
+
+    if len(input_files) < 2:
+        raise click.UsageError("--merge requires at least two --input files.")
+
+    contexts = []
+    for file_str in input_files:
+        file_path = Path(file_str)
+        src = source
+        if src is None:
+            try:
+                src = detect_source(str(file_path))
+            except ValueError as e:
+                raise click.ClickException(str(e)) from e
+        parser = get_parser(src)
+        try:
+            messages = parser.parse(file_path)
+        except (ValueError, FileNotFoundError) as e:
+            raise click.ClickException(f"Failed to parse {file_str}: {e}") from e
+        if not messages:
+            raise click.ClickException(f"No messages found in {file_str}.")
+
+        from handover import summarizer as _sum
+
+        try:
+            ctx = _sum.summarize(messages, use_llm=not no_llm)
+        except HandoverAPIError as e:
+            raise click.ClickException(str(e)) from e
+        ctx.source = src or "unknown"
+        contexts.append(ctx)
+
+    click.echo(f"Merging {len(contexts)} conversations…")
+    try:
+        merged = merge_contexts(contexts, use_llm=not no_llm)
+    except HandoverAPIError as e:
+        raise click.ClickException(str(e)) from e
+
+    output_path = Path(output_dir)
+    targets_to_run: list[str] = list_targets() if target == "all" else [target]
+
+    def _make_target(t_name: str) -> BaseTarget:
+        if t_name == "claude-code":
+            return ClaudeCodeTarget()
+        return get_target(t_name)
+
+    if dry_run:
+        click.echo(f"\nMerged goal: {merged.goal or '(none)'}")
+        click.echo(f"  Tasks: {len(merged.tasks)}  Decisions: {len(merged.decisions)}")
+        click.echo(f"\nWould write to {output_path}/:")
+        for t_name in targets_to_run:
+            for p in _make_target(t_name).generate(merged, output_path, dry_run=True):
+                click.echo(f"  -> {p.name}")
+        click.echo("\nRun without --dry-run to write files.")
+    else:
+        all_paths: list[Path] = []
+        for t_name in targets_to_run:
+            all_paths.extend(_make_target(t_name).generate(merged, output_path, dry_run=False))
+        names = ", ".join(p.name for p in all_paths)
+        click.echo(f"Wrote {names} to {output_path}/")
+        click.echo(f"Merged goal: {merged.goal or '(none)'}")
+
+
+@main.command("pull")
+@click.argument("gist_url")
+@click.option(
+    "--output",
+    "-o",
+    "output_dir",
+    type=click.Path(),
+    default=None,
+    help="Directory to write downloaded files (default: cwd)",
+)
+def pull_command(gist_url: str, output_dir: str | None) -> None:
+    """
+    Pull a shared handover from a GitHub Gist URL.
+
+    GIST_URL: Full GitHub Gist URL or Gist ID.
+
+    Examples:
+
+      handover pull https://gist.github.com/user/abc123
+
+      handover pull abc123def456 --output ./my-project/
+    """
+    from handover.publisher import PublisherError
+    from handover.publisher import pull as _pull
+
+    resolved_output = Path(output_dir) if output_dir else Path.cwd()
+
+    try:
+        written = _pull(gist_url, resolved_output)
+    except PublisherError as e:
+        raise click.ClickException(str(e)) from e
+
+    click.echo(f"Downloaded {len(written)} file(s) to {resolved_output}/:")
+    for p in written:
+        click.echo(f"  {p.name}")
