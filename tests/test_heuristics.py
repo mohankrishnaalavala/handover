@@ -242,3 +242,63 @@ class TestExtractOrchestrator:
         messages = [assistant("Which database should we use — PostgreSQL or MySQL?")]
         ctx = heuristics.extract(messages)
         assert isinstance(ctx.open_questions, list)
+
+
+class TestRegressionPatterns:
+    """Regression tests for AI assistant recommendation phrasing (heuristics quality fixes)."""
+
+    def test_extracts_recommendation_decision(self) -> None:
+        """AI assistant 'For a local-friendly setup: React + Vite' → Decision extracted."""
+        messages = [
+            assistant(
+                "For a local-friendly setup: React + Vite for the frontend, "
+                "FastAPI (Python) for the backend, and SQLite to start."
+            )
+        ]
+        decisions = heuristics.extract_decisions(messages)
+        assert len(decisions) >= 1
+
+    def test_extracts_stack_recommendation_decision(self) -> None:
+        """Stack recommendation phrasing → Decision extracted."""
+        messages = [
+            assistant(
+                "Stack recommendation\n\nFor the backend, use FastAPI with SQLite."
+            )
+        ]
+        decisions = heuristics.extract_decisions(messages)
+        assert len(decisions) >= 1
+
+    def test_extracts_constraint_to_start(self) -> None:
+        """'SQLite to start' phrasing → constraint extracted."""
+        messages = [
+            assistant("Use SQLite to start — easy to swap to Postgres later.")
+        ]
+        constraints = heuristics.extract_constraints(messages)
+        assert len(constraints) >= 1
+
+    def test_extracts_constraint_initially(self) -> None:
+        """'initially' phrasing → constraint extracted."""
+        messages = [
+            assistant("SQLite used initially for simplicity.")
+        ]
+        constraints = heuristics.extract_constraints(messages)
+        assert len(constraints) >= 1
+
+    def test_goal_cleaned_up_from_intent_prefix(self) -> None:
+        """Raw 'i want to build a X' → clean 'X' after stripping intent prefix."""
+        messages = [user("i want to build a water intake tracker webapp")]
+        goal = heuristics.extract_goal(messages)
+        assert not goal.lower().startswith("i want")
+        assert goal[0].isupper()
+
+    def test_goal_capitalised(self) -> None:
+        """Goal result is capitalised regardless of user casing."""
+        messages = [user("build a todo app with reminders")]
+        goal = heuristics.extract_goal(messages)
+        assert goal[0].isupper()
+
+    def test_go_not_matched_inside_postgres(self) -> None:
+        """'go' keyword must not match inside 'Postgres' (word-boundary regression)."""
+        messages = [assistant("We'll use PostgreSQL as the database.")]
+        tech_stack = heuristics.extract_tech_stack(messages)
+        assert tech_stack.get("language") != "Go"

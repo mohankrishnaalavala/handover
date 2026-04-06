@@ -44,6 +44,15 @@ Conflict resolution: when the same topic is discussed multiple times, \
 the LATEST decision wins.
 Only include non-empty fields. Use empty lists [] for missing sections.
 
+Field-specific rules:
+- goal: write a clean, concise one-sentence project goal in plain English. Do NOT copy \
+the user's raw question verbatim — rephrase it as a goal statement starting with a verb \
+(e.g. "Build a webapp that...").
+- open_questions: only include genuine unresolved design or architecture questions that \
+the team still needs to decide. Skip the assistant's closing rhetorical offers \
+(e.g. "Want me to generate X?", "Should I create the files now?", \
+"Would you like me to...?") — these are not open questions.
+
 Conversation:
 {conversation}"""
 

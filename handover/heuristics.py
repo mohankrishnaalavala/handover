@@ -36,6 +36,7 @@ INTENT_KEYWORDS = [
 
 # Decision keywords
 DECISION_KEYWORDS = [
+    # Explicit choices
     "let's use",
     "we'll go with",
     "decided to",
@@ -43,6 +44,23 @@ DECISION_KEYWORDS = [
     "i think we should",
     "going with",
     "we're using",
+    # Recommendation phrasing (common in AI assistant responses)
+    "recommendation:",
+    "recommend ",
+    "i recommend",
+    "i suggest",
+    "suggested:",
+    "for a local",
+    "the best approach",
+    "a good choice",
+    "works well for",
+    "start with",
+    "use the browser",
+    "for the frontend",
+    "for the backend",
+    "for styling",
+    "for auth",
+    "for the database",
 ]
 
 # Constraint keywords
@@ -55,6 +73,15 @@ CONSTRAINT_KEYWORDS = [
     "needs to",
     "has to",
     "required to",
+    # Softer constraint phrasing
+    "to start",
+    "initially",
+    "for now",
+    "keep it simple",
+    "run locally",
+    "local only",
+    "easy to swap",
+    "can be swapped",
 ]
 
 # Non-goal keywords
@@ -202,11 +229,47 @@ def extract(messages: list[ConversationMessage]) -> HandoverContext:
     )
 
 
+# Prefixes to strip from user goals before capitalising
+_GOAL_STRIP_PREFIXES = [
+    "i want to build ",
+    "i want to create ",
+    "i want to make ",
+    "i need to build ",
+    "i need to create ",
+    "i'd like to build ",
+    "i'd like to create ",
+    "can you help me build ",
+    "can you help me create ",
+    "help me build ",
+    "help me create ",
+    "build me ",
+    "create ",
+    "i want ",
+    "i need ",
+]
+
+
+def _clean_goal(raw: str) -> str:
+    """Strip leading intent phrases and capitalise the result."""
+    cleaned = raw.strip().rstrip("?")
+    lower = cleaned.lower()
+    for prefix in _GOAL_STRIP_PREFIXES:
+        if lower.startswith(prefix):
+            cleaned = cleaned[len(prefix):]
+            lower = cleaned.lower()
+            break
+    # Capitalise first letter
+    if cleaned:
+        cleaned = cleaned[0].upper() + cleaned[1:]
+    return cleaned[:300]
+
+
 def extract_goal(messages: list[ConversationMessage]) -> str:
     """
     Extract the project goal from conversation messages.
 
     Rule: First sentence containing an intent keyword in a user message.
+    Applies light cleanup: strips leading "I want to build" phrases and capitalises.
     Fallback: first user message content (trimmed to 300 chars).
     See PRD Section 8, field: goal.
     """
@@ -218,13 +281,12 @@ def extract_goal(messages: list[ConversationMessage]) -> str:
         lower = msg.content.lower()
         for kw in INTENT_KEYWORDS:
             if kw in lower:
-                # Return the sentence containing the keyword
                 for sentence in _sentences(msg.content):
                     if kw in sentence.lower():
-                        return sentence[:300]
+                        return _clean_goal(sentence)
 
     # Fallback: first user message
-    return user_messages[0].content[:300]
+    return _clean_goal(user_messages[0].content)
 
 
 def extract_decisions(messages: list[ConversationMessage]) -> list[Decision]:
