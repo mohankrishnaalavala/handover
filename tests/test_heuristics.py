@@ -260,27 +260,19 @@ class TestRegressionPatterns:
 
     def test_extracts_stack_recommendation_decision(self) -> None:
         """Stack recommendation phrasing → Decision extracted."""
-        messages = [
-            assistant(
-                "Stack recommendation\n\nFor the backend, use FastAPI with SQLite."
-            )
-        ]
+        messages = [assistant("Stack recommendation\n\nFor the backend, use FastAPI with SQLite.")]
         decisions = heuristics.extract_decisions(messages)
         assert len(decisions) >= 1
 
     def test_extracts_constraint_to_start(self) -> None:
         """'SQLite to start' phrasing → constraint extracted."""
-        messages = [
-            assistant("Use SQLite to start — easy to swap to Postgres later.")
-        ]
+        messages = [assistant("Use SQLite to start — easy to swap to Postgres later.")]
         constraints = heuristics.extract_constraints(messages)
         assert len(constraints) >= 1
 
     def test_extracts_constraint_initially(self) -> None:
         """'initially' phrasing → constraint extracted."""
-        messages = [
-            assistant("SQLite used initially for simplicity.")
-        ]
+        messages = [assistant("SQLite used initially for simplicity.")]
         constraints = heuristics.extract_constraints(messages)
         assert len(constraints) >= 1
 

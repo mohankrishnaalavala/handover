@@ -190,9 +190,7 @@ _MUST_WITH_SUBJECT_RE = re.compile(
 )
 
 # List item patterns: "1. item", "- item", "* item", "Phase N — ..."
-_LIST_ITEM_RE = re.compile(
-    r"^\s*(?:\d+[.)]\s+|[-*]\s+|Phase\s+\d+\s*[—\-–]\s*)(.+)$", re.MULTILINE
-)
+_LIST_ITEM_RE = re.compile(r"^\s*(?:\d+[.)]\s+|[-*]\s+|Phase\s+\d+\s*[—\-–]\s*)(.+)$", re.MULTILINE)
 
 # Open question patterns
 _QUESTION_RE = re.compile(r"[^.!?]*\?")
@@ -255,7 +253,7 @@ def _clean_goal(raw: str) -> str:
     lower = cleaned.lower()
     for prefix in _GOAL_STRIP_PREFIXES:
         if lower.startswith(prefix):
-            cleaned = cleaned[len(prefix):]
+            cleaned = cleaned[len(prefix) :]
             lower = cleaned.lower()
             break
     # Capitalise first letter
