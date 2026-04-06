@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.0.1] - 2026-04-06
+
+### Fixed
+- `handover mcp`: `FastMCP.__init__()` no longer accepts `version` or `description`
+  kwargs in mcp>=1.27. Updated to use `instructions` — fixes MCP server crash on startup
+  in Claude Desktop and Claude Code.
+- `handover reverse --no-llm`: tightened decision-extraction heuristics to require
+  ≥20 trailing chars and ≥35 total chars per match, eliminating false positives
+  like short fragments ("using a distinct name:") that were not real decisions.
+
 ## [1.0.0] - 2026-04-06
 
 ### Added

@@ -34,18 +34,22 @@ _CONTEXT_WINDOW_TOKENS = 200_000
 # Minimum token count to bother estimating context usage
 _MIN_TOKENS_FOR_ESTIMATE = 1_000
 
-# Patterns that signal a decision in assistant text
+# Patterns that signal a decision in assistant text.
+# Each pattern requires enough trailing context (≥20 chars) to avoid
+# matching sentence fragments like "using a distinct name:".
 _DECISION_PATTERNS = [
-    r"I (?:chose|decided|opted|selected|went with|used|picked)\b.{10,120}",
-    r"(?:chose|using|chose to use|we (?:use|chose))\b.{10,100}",
-    r"instead of\b.{5,80}",
-    r"rather than\b.{5,80}",
-    r"(?:approach|strategy|pattern|design)[:—]\s*.{10,120}",
+    r"I (?:chose|decided|opted|selected|went with|picked)\b.{20,150}",
+    r"(?:chose to|we (?:chose|decided|opted|went with))\b.{20,120}",
+    r"instead of\b.{20,100}",
+    r"rather than\b.{20,100}",
+    r"(?:approach|strategy|pattern|design)[:—]\s*.{20,150}",
 ]
 _DECISION_RE = re.compile(
     "|".join(f"(?:{p})" for p in _DECISION_PATTERNS),
     re.IGNORECASE,
 )
+# Minimum character length for a decision to be kept
+_MIN_DECISION_LEN = 35
 
 
 def reverse(
@@ -345,7 +349,7 @@ def _extract_decisions_heuristic(entries: list[dict[str, Any]]) -> list[str]:
 
         for match in _DECISION_RE.finditer(text):
             decision = match.group(0).strip().rstrip(".,;")
-            if decision and decision not in seen:
+            if decision and len(decision) >= _MIN_DECISION_LEN and decision not in seen:
                 seen.add(decision)
                 decisions.append(decision)
                 if len(decisions) >= 10:
