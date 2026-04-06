@@ -1,62 +1,130 @@
 # Contributing to handover
 
-Thank you for your interest in contributing! `handover` is an open-source project and contributions are very welcome.
+Thank you for your interest in contributing! `handover` is a v1.0.0 open-source project and contributions are welcome across all layers.
 
 ## Setup
 
 ```bash
 git clone https://github.com/mohankrishnaalavala/handover.git
 cd handover
-pip install -e ".[dev]"
+pip install -e ".[dev,watch]"
+```
+
+Optional extras for full feature coverage:
+
+```bash
+pip install -e ".[dev,watch,mcp]"
 ```
 
 ## Running Tests
 
 ```bash
-pytest tests/ -v --cov=handover --cov-report=term-missing
+pytest tests/ -v --cov=handover --cov-report=term-missing --cov-fail-under=80
 ```
 
-All tests must pass before submitting a PR. Never commit code that breaks existing tests.
+All tests must pass and coverage must stay above 80% before a PR can merge.
 
-## Primary Contribution Path: Adding a New Source Adapter
+## Linting
 
-Adding a new source (ChatGPT, Gemini, Perplexity, etc.) is the primary way to contribute. Each adapter is one self-contained class in `handover/parsers/`. A contributor can own an adapter end-to-end as an isolated PR.
+```bash
+ruff check handover/ tests/
+ruff format --check handover/ tests/
+mypy handover/
+```
 
-See **[docs/adding-an-adapter.md](docs/adding-an-adapter.md)** for the complete step-by-step guide.
+---
 
-In brief, adding a new adapter means:
-1. Create `handover/parsers/{source_name}.py` — subclass `BaseParser`
-2. Register the adapter in `parsers/__init__.py`
+## Contribution Paths
+
+### 1. New source adapter (parser)
+
+Adding a new chat source is the most isolated, self-contained contribution. Each adapter is one file in `handover/parsers/`.
+
+See **[docs/adding-an-adapter.md](docs/adding-an-adapter.md)** for the complete guide.
+
+In brief:
+1. Create `handover/parsers/{source}.py` — subclass `BaseParser`
+2. Register in `handover/parsers/__init__.py`
 3. Add a test fixture in `tests/fixtures/`
 4. Add tests in `tests/test_parser.py`
 5. Update the supported formats table in `README.md`
-6. Add the source name to the `--source` flag in `cli.py`
+6. Add the source name to the `--source` flag help text in `handover/cli.py`
+
+### 2. New output target
+
+Adding a new agent target (e.g., a new coding agent format) mirrors the parser adapter pattern.
+
+See **[docs/adding-a-target.md](docs/adding-a-target.md)** for the complete guide.
+
+In brief:
+1. Create `handover/targets/{name}.py` — subclass `BaseTarget`
+2. Register in `handover/targets/__init__.py`
+3. Add tests in `tests/test_targets.py`
+4. Update the targets table in `README.md`
+
+### 3. Browser extension
+
+The extension lives in `extension/`. It is a Chrome/Firefox MV3 extension with:
+- `background.js` — service worker (fetch, download, server POST)
+- `content/claude.js` — DOM/API extraction for claude.ai
+- `content/chatgpt.js` — DOM extraction for chat.openai.com and chatgpt.com
+- `popup/` — extension UI
+
+Good contribution areas:
+- New content scripts for additional sites (e.g., Gemini, Perplexity)
+- UX improvements in the popup
+- Bug fixes in the extraction logic
+
+Build the distributable zip: `bash scripts/build-extension.sh`
+
+### 4. MCP server
+
+The MCP server lives in `handover/mcp_server.py`. It exposes a single `run_handover` tool via FastMCP.
+
+Contributions:
+- Additional MCP tools (e.g., `list_history`, `run_merge`)
+- Schema improvements for better Claude Code integration
+
+Requires `pip install handover[mcp]`.
+
+### 5. Docs and DX
+
+Improving guides, fixing inaccuracies, and adding examples are high-value contributions:
+- `docs/` — guides for users and contributors
+- `README.md` — primary user-facing doc
+- `CHANGELOG.md` — keep entries accurate and linked
+
+### 6. Bug fixes
+
+Check open issues on GitHub. Good labels to look for: `bug`, `good first issue`.
+
+---
 
 ## Code Standards
 
-The following standards are taken directly from `CLAUDE.md` and apply to all contributions:
-
 - **Type hints** on all functions and methods
 - **Docstrings** on all public methods
-- **Tests required** for: parser output, heuristics rules, generator file output
-- Mocked API calls in `test_summarizer.py` — never hit the real Anthropic API in tests
-- No additional dependencies beyond: `click`, `anthropic`, `jinja2`, `pytest`, `pytest-cov`
+- **Tests required** for any changed behavior
+- Mocked API calls in tests — never hit the real Anthropic API in tests
+- No new **core** runtime dependencies (`click`, `anthropic`, `jinja2` only)
+- Optional deps go in `pyproject.toml` extras
 
 ## Submitting a Pull Request
 
-1. Fork the repo and create a feature branch
-2. Make your changes, add tests, update docs
-3. Run `pytest tests/ -v` — all tests must pass
-4. Update `PLAN.md` if your PR completes any listed tasks
-5. Open a PR against `main` using the PR template
+1. Fork the repo and create a feature branch from `main`
+2. Make your changes with tests
+3. Run the full test suite and lint — everything must pass
+4. Open a PR against `main` with a clear description of what changed and why
 
-## Project Phases
+---
 
-Before contributing, it helps to understand the roadmap:
+## Current State (v1.0.1)
 
-- **Phase 1** (current): Claude chat → Claude Code. This is what we're building now.
-- **Phase 2**: Universal chat sources — ChatGPT, Gemini, Perplexity adapters. **This is the main open contribution path.**
-- **Phase 3**: Reverse handover — Claude Code session logs → readable handover doc.
-- **Phase 4**: Additional target agents (Aider, Goose, Codex CLI).
+All planned phases are shipped:
+- Phases 1–2: Claude, ChatGPT, Gemini, Perplexity → CLAUDE.md + PLAN.md
+- Phase 3: `handover serve` HTTP bridge + browser extension (claude.ai, chatgpt.com)
+- Phase 4: `handover reverse` — Claude Code session → HANDOVER.md
+- Phase 5: Multi-target output (Codex CLI, Aider, Goose)
+- Phase 6: MCP server, `handover history`, `handover merge`, Gist publish/pull
 
-Please check open issues and the `PLAN.md` before starting work to avoid duplicating effort.
+The primary open contribution opportunities are new source adapters, new target adapters, new browser extension content scripts, and MCP tool additions.

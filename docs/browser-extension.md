@@ -1,27 +1,38 @@
 # Browser Extension — Install & Usage Guide
 
-The **handover** browser extension lets you send any AI chat conversation to your local Claude Code agent with one click. No manual export, no copy-paste.
+The **handover** browser extension lets you send any AI chat conversation to your local agent pipeline with one click. No manual export, no copy-paste.
 
 **Supported browsers:** Chrome 116+, Firefox 109+ (both support Manifest V3)  
-**Supported chat sites:** claude.ai, chat.openai.com
+**Supported chat sites:** claude.ai, chatgpt.com (chat.openai.com)
+
+---
+
+## Support matrix
+
+| Feature | claude.ai | chatgpt.com |
+|---------|-----------|-------------|
+| **Export Chat as JSON** (download for offline use) | ✅ Uses claude.ai API | ❌ Not supported — use CLI import instead |
+| **Generate handover artifacts** (live pipeline via `handover serve`) | ✅ | ✅ |
+
+> Gemini and Perplexity export parsing is supported by the **CLI** (`handover --input export.json`), but live browser extraction for those sites is not yet implemented in the extension.
 
 ---
 
 ## How it works
 
 ```
-Browser tab (claude.ai / chat.openai.com)
-      │  click "Send to Claude Code"
+Browser tab (claude.ai / chatgpt.com)
+      │  click "Generate handover artifacts"
       ▼
-Extension popup  →  content script extracts DOM messages
+Extension popup  →  content script extracts conversation
       │
       ▼
-background.js  ──POST /handover──▶  handover serve (localhost:7437)
+background.js  ──POST /handover──▶  handover serve (localhost:<port>)
                                           │
                                      full pipeline:
                                      parse → summarize → generate
                                           │
-                                    CLAUDE.md + PLAN.md
+                                    CLAUDE.md + PLAN.md (and more)
                                      written to output dir
 ```
 
@@ -46,6 +57,9 @@ handover serve --output ~/projects/myapp/
 
 # Offline mode (no API key required)
 handover serve --no-llm
+
+# Custom port
+handover serve --port 8123
 
 # Run in the background (logs → ~/.handover/server.log)
 handover serve --output ~/projects/myapp/ --daemon
@@ -83,16 +97,32 @@ bash scripts/build-extension.sh
 
 ## Usage
 
-1. Navigate to a conversation on **claude.ai** or **chat.openai.com**
+### Generate handover artifacts (claude.ai and chatgpt.com)
+
+1. Navigate to a conversation on **claude.ai** or **chatgpt.com**
 2. Click the **handover** toolbar icon
 3. Set the **Output directory** to your project root (saved automatically)
-4. Click **Send to Claude Code**
+4. Click **Generate handover artifacts**
 
 The popup shows:
-- `Extracting conversation…` — reading the DOM
+- `Extracting conversation…` — reading the page
 - `Running handover pipeline…` — calling `handover serve`
-- `Done — CLAUDE.md written to <path>` on success
+- `Done — artifacts written to <path>` on success
 - An error message if the server is not running or extraction failed
+
+### Export Chat as JSON (claude.ai only)
+
+1. Navigate to a conversation on **claude.ai**
+2. Click the **handover** toolbar icon
+3. Click **Export Chat as JSON**
+
+The file downloads as `handover-chat-<uuid>.json`. Then run locally:
+
+```bash
+handover --input ~/Downloads/handover-chat-<uuid>.json --output ./my-project/ --no-llm
+```
+
+This is the recommended workflow for ChatGPT too — export from the ChatGPT web UI (Settings → Data Controls → Export Data), then pass the file to the CLI.
 
 ---
 
@@ -104,9 +134,10 @@ The popup shows:
 | Server port | Popup input field | `7437` |
 | No-LLM mode | `handover serve --no-llm` | off |
 
-Settings are saved in `chrome.storage.local` per browser profile.
+Settings are saved in `chrome.storage.local` per browser profile.  
+The port in the popup must match the port `handover serve` is listening on.
 
-You can also update the server configuration at runtime via the API:
+You can also update the server configuration at runtime:
 
 ```bash
 curl -X POST http://localhost:7437/config \
@@ -125,7 +156,7 @@ The local server exposes three endpoints:
 Returns server status and version.
 
 ```json
-{ "status": "ok", "version": "0.3.0" }
+{ "status": "ok", "version": "1.0.1" }
 ```
 
 ### `POST /handover`
@@ -163,14 +194,17 @@ Update the server configuration without restarting.
 
 ## Troubleshooting
 
-**"Cannot reach handover server on port 7437"**  
-→ The server is not running. Run `handover serve` in a terminal first.
+**"Cannot reach handover server on port \<port\>"**  
+→ The server is not running on that port. Run `handover serve` (or `handover serve --port <port>` if you configured a custom port) in a terminal first.
 
 **"No conversation found"**  
-→ Make sure you are on a conversation page (not the Claude home page or ChatGPT home). Scroll through the conversation once to ensure all messages are loaded in the DOM.
+→ Make sure you are on a conversation page (not the home page). On ChatGPT, the URL should contain `/c/`. Scroll through the conversation once to ensure all messages are loaded.
+
+**"Export as JSON requires a claude.ai conversation"**  
+→ The Export button uses the claude.ai API and only works on claude.ai. For ChatGPT, use the ChatGPT web export or "Generate handover artifacts" instead.
 
 **"Unsupported page"**  
-→ The extension only works on `claude.ai` and `chat.openai.com` (Gemini and Perplexity DOM scrapers are planned for v0.3.1).
+→ The extension currently supports **claude.ai** and **chatgpt.com** (chat.openai.com). Gemini and Perplexity live extraction are not yet implemented — use the CLI with their exported files instead.
 
 **Content script not responding after a navigation**  
 → Refresh the page and try again — MV3 service workers unload between navigations.
