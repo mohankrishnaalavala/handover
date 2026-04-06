@@ -162,8 +162,10 @@ _MUST_WITH_SUBJECT_RE = re.compile(
     re.IGNORECASE,
 )
 
-# List item patterns: "1. item", "- item", "* item"
-_LIST_ITEM_RE = re.compile(r"^\s*(?:\d+[.)]\s+|[-*]\s+)(.+)$", re.MULTILINE)
+# List item patterns: "1. item", "- item", "* item", "Phase N — ..."
+_LIST_ITEM_RE = re.compile(
+    r"^\s*(?:\d+[.)]\s+|[-*]\s+|Phase\s+\d+\s*[—\-–]\s*)(.+)$", re.MULTILINE
+)
 
 # Open question patterns
 _QUESTION_RE = re.compile(r"[^.!?]*\?")
@@ -362,6 +364,7 @@ def extract_tech_stack(messages: list[ConversationMessage]) -> dict[str, str]:
     Rule: Match known tech keywords from TECH_KEYWORDS across all messages.
     Returns canonical display names (e.g. "FastAPI" not "fastapi").
     Last keyword found per category wins if multiple match.
+    Uses word-boundary matching to avoid false positives (e.g. "go" in "Postgres").
     See PRD Section 8, field: tech_stack.
     """
     full_text = " ".join(m.content for m in messages).lower()
@@ -369,7 +372,8 @@ def extract_tech_stack(messages: list[ConversationMessage]) -> dict[str, str]:
 
     for category, keywords in TECH_KEYWORDS.items():
         for tech in keywords:
-            if tech in full_text:
+            # Use word-boundary regex so "go" doesn't match inside "Postgres", "Good", etc.
+            if re.search(r"\b" + re.escape(tech) + r"\b", full_text):
                 canonical = _TECH_CANONICAL.get(tech, tech)
                 result[category] = canonical  # last match per category wins
 
@@ -392,6 +396,16 @@ def extract_open_questions(messages: list[ConversationMessage]) -> list[str]:
         for match in _QUESTION_RE.finditer(msg.content):
             q = match.group(0).strip()
             if len(q) < 20:
+                continue
+            # Skip fragments that are clearly code/markdown artifacts
+            # e.g. starts with backtick, or starts with a word followed by backtick (like `md`...)
+            stripped = q.lstrip()
+            if stripped.startswith("`") or stripped.startswith("*"):
+                continue
+            if re.match(r"^[a-z]\w*`", stripped):
+                continue
+            # Must contain at least one real word character (letter)
+            if not re.search(r"[a-zA-Z]{3,}", q):
                 continue
             dedup = re.sub(r"[^a-z0-9 ]", "", q.lower()).strip()
             if dedup and dedup not in seen_lower:
