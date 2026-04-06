@@ -70,12 +70,12 @@ async function handleExport(tabId) {
   // conv = { uuid, name, chat_messages: [...] }
   const filename = `handover-chat-${conv.uuid || "export"}.json`;
   const json = JSON.stringify(conv, null, 2);
-  const blob = new Blob([json], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
+  // Use a data: URL — Blob/URL.createObjectURL is not available in MV3 service workers
+  const dataUrl =
+    "data:application/json;charset=utf-8," + encodeURIComponent(json);
 
   return new Promise((resolve, reject) => {
-    chrome.downloads.download({ url, filename, saveAs: false }, (downloadId) => {
-      URL.revokeObjectURL(url);
+    chrome.downloads.download({ url: dataUrl, filename, saveAs: false }, (downloadId) => {
       if (chrome.runtime.lastError || downloadId === undefined) {
         reject(new Error(chrome.runtime.lastError?.message || "Download failed."));
         return;
