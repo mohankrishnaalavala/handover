@@ -1,11 +1,17 @@
 /**
  * background.js — MV3 service worker
  *
- * Flow:
- *   popup.js  ──sendMessage──▶  background.js  ──fetch──▶  localhost:7437/handover
- *                                                               │
- *                               ◀──result/error──────────────────
- *   popup.js  ◀──sendResponse──
+ * Handles two actions from popup.js:
+ *
+ *   {action: "export", tabId}
+ *     → Asks content script to fetch conversation via claude.ai API
+ *     → Triggers chrome.downloads to save as handover-chat-<uuid>.json
+ *     → Returns { success, filename } or { success: false, error }
+ *
+ *   {action: "handover", tabId}
+ *     → Asks content script to extract conversation (API → DOM fallback)
+ *     → POSTs to local handover server at /handover
+ *     → Returns { success, result } or { success: false, error }
  */
 
 "use strict";
@@ -14,66 +20,27 @@ const HANDOVER_PORT_KEY = "handover_port";
 const HANDOVER_OUTPUT_KEY = "handover_output_dir";
 const DEFAULT_PORT = 7437;
 
-/**
- * Get the configured port and output directory from storage.
- * @returns {Promise<{port: number, outputDir: string}>}
- */
+// ─── config helpers ───────────────────────────────────────────────────────────
+
 async function getConfig() {
   return new Promise((resolve) => {
-    chrome.storage.local.get(
-      [HANDOVER_PORT_KEY, HANDOVER_OUTPUT_KEY],
-      (items) => {
-        resolve({
-          port: items[HANDOVER_PORT_KEY] || DEFAULT_PORT,
-          outputDir: items[HANDOVER_OUTPUT_KEY] || "",
-        });
-      }
-    );
-  });
-}
-
-/**
- * POST conversation data to the local handover server.
- * @param {number} port
- * @param {string} outputDir
- * @param {Object} payload  - { source, conversation }
- * @returns {Promise<Object>} - server response JSON
- */
-async function postToServer(port, outputDir, payload) {
-  // If an output directory is set, update the server config first
-  if (outputDir) {
-    try {
-      await fetch(`http://localhost:${port}/config`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ output_dir: outputDir }),
+    chrome.storage.local.get([HANDOVER_PORT_KEY, HANDOVER_OUTPUT_KEY], (items) => {
+      resolve({
+        port: items[HANDOVER_PORT_KEY] || DEFAULT_PORT,
+        outputDir: items[HANDOVER_OUTPUT_KEY] || "",
       });
-    } catch (_) {
-      // Non-fatal — server may still use its default config
-    }
-  }
-
-  const resp = await fetch(`http://localhost:${port}/handover`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    });
   });
-
-  const data = await resp.json();
-  if (!resp.ok) {
-    throw new Error(data.message || `Server error ${resp.status}`);
-  }
-  return data;
 }
 
+// ─── content script bridge ────────────────────────────────────────────────────
+
 /**
- * Ask the active tab's content script to extract the conversation.
- * @param {number} tabId
- * @returns {Promise<{source: string, conversation: Object}>}
+ * Send a message to the tab's content script and return the response.
  */
-function extractFromTab(tabId) {
+function sendToTab(tabId, message) {
   return new Promise((resolve, reject) => {
-    chrome.tabs.sendMessage(tabId, { action: "extract" }, (response) => {
+    chrome.tabs.sendMessage(tabId, message, (response) => {
       if (chrome.runtime.lastError) {
         reject(
           new Error(
@@ -84,7 +51,7 @@ function extractFromTab(tabId) {
         return;
       }
       if (!response || !response.success) {
-        reject(new Error(response?.error || "Extraction failed"));
+        reject(new Error(response?.error || "Content script returned no data."));
         return;
       }
       resolve(response.data);
@@ -92,43 +59,99 @@ function extractFromTab(tabId) {
   });
 }
 
-// ------------------------------------------------------------------
-// Message listener — called by popup.js
-// ------------------------------------------------------------------
+// ─── export action ────────────────────────────────────────────────────────────
 
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action !== "handover") {
-    return false;
+/**
+ * Fetch the full conversation via the claude.ai API and download as JSON.
+ */
+async function handleExport(tabId) {
+  const conv = await sendToTab(tabId, { action: "export" });
+
+  // conv = { uuid, name, chat_messages: [...] }
+  const filename = `handover-chat-${conv.uuid || "export"}.json`;
+  const json = JSON.stringify(conv, null, 2);
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+
+  return new Promise((resolve, reject) => {
+    chrome.downloads.download({ url, filename, saveAs: false }, (downloadId) => {
+      URL.revokeObjectURL(url);
+      if (chrome.runtime.lastError || downloadId === undefined) {
+        reject(new Error(chrome.runtime.lastError?.message || "Download failed."));
+        return;
+      }
+      resolve({
+        filename,
+        messageCount: conv.chat_messages?.length ?? 0,
+        title: conv.name,
+      });
+    });
+  });
+}
+
+// ─── handover (live pipeline) action ─────────────────────────────────────────
+
+async function postToServer(port, outputDir, payload) {
+  if (outputDir) {
+    try {
+      await fetch(`http://localhost:${port}/config`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ output_dir: outputDir }),
+      });
+    } catch (_) {
+      // Non-fatal
+    }
   }
 
-  const { tabId } = request;
+  const resp = await fetch(`http://localhost:${port}/handover`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
 
-  (async () => {
-    try {
-      const { port, outputDir } = await getConfig();
+  const data = await resp.json();
+  if (!resp.ok) throw new Error(data.message || `Server error ${resp.status}`);
+  return data;
+}
 
-      // 1. Extract conversation from the active tab
-      const payload = await extractFromTab(tabId);
+async function handleHandover(tabId) {
+  const { port, outputDir } = await getConfig();
+  const payload = await sendToTab(tabId, { action: "extract" });
 
-      // 2. POST to local server
-      const result = await postToServer(port, outputDir, payload);
+  return postToServer(port, outputDir, payload);
+}
 
-      sendResponse({ success: true, result });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      const isServerDown =
-        message.includes("Failed to fetch") ||
-        message.includes("NetworkError") ||
-        message.includes("ECONNREFUSED");
+// ─── message listener ─────────────────────────────────────────────────────────
 
-      sendResponse({
-        success: false,
-        error: isServerDown
-          ? `Cannot reach handover server on port ${DEFAULT_PORT}. Run: handover serve`
-          : message,
+chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
+  const { action, tabId } = request;
+
+  if (action === "export") {
+    handleExport(tabId)
+      .then((result) => sendResponse({ success: true, result }))
+      .catch((err) => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
+
+  if (action === "handover") {
+    handleHandover(tabId)
+      .then((result) => sendResponse({ success: true, result }))
+      .catch((err) => {
+        const message = err instanceof Error ? err.message : String(err);
+        const isServerDown =
+          message.includes("Failed to fetch") ||
+          message.includes("NetworkError") ||
+          message.includes("ECONNREFUSED");
+        sendResponse({
+          success: false,
+          error: isServerDown
+            ? `Cannot reach handover server on port ${DEFAULT_PORT}. Run: handover serve`
+            : message,
+        });
       });
-    }
-  })();
+    return true;
+  }
 
-  return true; // keep the message channel open for async sendResponse
+  return false;
 });
