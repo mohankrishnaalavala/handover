@@ -171,8 +171,8 @@ class ClaudeCodeSessionParser(BaseParser):
         Derive the Claude Code projects directory name for a given path.
 
         Claude Code names its per-project directory by replacing every "/"
-        in the absolute path with "-":
-          /Users/alice/projects/myapp  →  -Users-alice-projects-myapp
+        and "_" in the absolute path with "-":
+          /Users/alice/projects/my_app  →  -Users-alice-projects-my-app
 
         Args:
             project_path: Absolute path to the project root.
@@ -180,7 +180,7 @@ class ClaudeCodeSessionParser(BaseParser):
         Returns:
             Directory name used by Claude Code under ~/.claude/projects/.
         """
-        return str(project_path).replace("/", "-")
+        return str(project_path).replace("/", "-").replace("_", "-")
 
     def _read_session_meta(self, jsonl_file: Path) -> SessionMeta | None:
         """Extract lightweight metadata from a session file without reading it fully."""

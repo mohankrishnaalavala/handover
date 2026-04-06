@@ -4,7 +4,7 @@
   "version": "0.3.0",
   "description": "Send any AI chat to your local Claude Code agent — zero context lost.",
 
-  "permissions": ["activeTab", "storage", "notifications"],
+  "permissions": ["activeTab", "storage", "notifications", "downloads"],
   "host_permissions": [
     "https://claude.ai/*",
     "https://chat.openai.com/*",

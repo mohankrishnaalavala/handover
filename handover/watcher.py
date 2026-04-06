@@ -117,7 +117,7 @@ def start_watching(
         idle_seconds=idle_seconds,
     )
 
-    class _Adapter(FileSystemEventHandler):  # type: ignore[misc]
+    class _Adapter(FileSystemEventHandler):
         def on_created(self, event: object) -> None:
             if not getattr(event, "is_directory", False):
                 debouncer.on_created(getattr(event, "src_path", ""))

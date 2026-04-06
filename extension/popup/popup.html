@@ -12,6 +12,18 @@
     <span class="tagline">Design in chat. Build in terminal.</span>
   </div>
 
+  <!-- ── Primary action: export JSON ─────────────────────────────────── -->
+  <button id="btn-export" class="primary">
+    Export Chat as JSON
+  </button>
+
+  <div id="status-export" class="status hidden"></div>
+
+  <div class="divider">
+    <span>or send to local server</span>
+  </div>
+
+  <!-- ── Secondary action: live pipeline ─────────────────────────────── -->
   <div class="section">
     <label for="output-dir">Output directory</label>
     <input
@@ -27,16 +39,14 @@
     <input id="port" type="number" value="7437" min="1024" max="65535" />
   </div>
 
-  <button id="btn-handover" class="primary">
+  <button id="btn-handover" class="secondary">
     Send to Claude Code
   </button>
 
-  <div id="status" class="status hidden"></div>
+  <div id="status-handover" class="status hidden"></div>
 
   <div class="footer">
-    <a id="settings-link" href="#" title="How to start the server">
-      Run <code>handover serve</code> first
-    </a>
+    <span>Send requires <code>handover serve</code> running locally</span>
   </div>
 
   <script src="popup.js"></script>
