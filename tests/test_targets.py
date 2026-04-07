@@ -6,7 +6,7 @@ Verifies that:
   - dry_run=True returns expected paths without writing any files
   - Registry functions (get_target, list_targets) behave correctly
   - CLI --target flag routes to the correct adapter
-  - --target all writes all four formats
+  - --target all writes all registered formats
 
 No real API calls are made (--no-llm / heuristics used throughout).
 """
@@ -25,6 +25,7 @@ from handover.targets import TARGET_REGISTRY, get_target, list_targets
 from handover.targets.aider import AiderTarget
 from handover.targets.claude_code import ClaudeCodeTarget
 from handover.targets.codex import CodexTarget
+from handover.targets.copilot import CopilotTarget
 from handover.targets.goose import GooseTarget
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -65,21 +66,23 @@ def make_context() -> HandoverContext:
 
 
 class TestRegistry:
-    def test_list_targets_returns_all_four(self) -> None:
+    def test_list_targets_contains_all_registered(self) -> None:
         targets = list_targets()
         assert "claude-code" in targets
         assert "codex" in targets
         assert "aider" in targets
         assert "goose" in targets
+        assert "copilot" in targets
 
     def test_list_targets_length(self) -> None:
-        assert len(list_targets()) == 4
+        assert len(list_targets()) == 5
 
     def test_get_target_returns_correct_instance(self) -> None:
         assert isinstance(get_target("claude-code"), ClaudeCodeTarget)
         assert isinstance(get_target("codex"), CodexTarget)
         assert isinstance(get_target("aider"), AiderTarget)
         assert isinstance(get_target("goose"), GooseTarget)
+        assert isinstance(get_target("copilot"), CopilotTarget)
 
     def test_get_target_raises_on_unknown(self) -> None:
         with pytest.raises(ValueError, match="No target registered"):
@@ -151,71 +154,102 @@ class TestCodexTarget:
         t.generate(make_context(), tmp_path)
         assert (tmp_path / "AGENTS.md").exists()
 
-    def test_returns_agents_md_path(self, tmp_path: Path) -> None:
+    def test_generates_tasks_md(self, tmp_path: Path) -> None:
+        t = CodexTarget()
+        t.generate(make_context(), tmp_path)
+        assert (tmp_path / "TASKS.md").exists()
+
+    def test_returns_two_paths(self, tmp_path: Path) -> None:
         t = CodexTarget()
         paths = t.generate(make_context(), tmp_path)
-        assert paths[0].name == "AGENTS.md"
+        assert len(paths) == 2
+        names = {p.name for p in paths}
+        assert "AGENTS.md" in names
+        assert "TASKS.md" in names
 
     def test_dry_run_no_files_written(self, tmp_path: Path) -> None:
         t = CodexTarget()
         t.generate(make_context(), tmp_path, dry_run=True)
         assert not (tmp_path / "AGENTS.md").exists()
+        assert not (tmp_path / "TASKS.md").exists()
 
-    def test_dry_run_returns_path(self, tmp_path: Path) -> None:
+    def test_dry_run_returns_both_paths(self, tmp_path: Path) -> None:
         t = CodexTarget()
         paths = t.generate(make_context(), tmp_path, dry_run=True)
-        assert paths[0].name == "AGENTS.md"
+        names = {p.name for p in paths}
+        assert "AGENTS.md" in names
+        assert "TASKS.md" in names
 
-    def test_content_contains_goal(self, tmp_path: Path) -> None:
+    def test_agents_md_contains_goal(self, tmp_path: Path) -> None:
         t = CodexTarget()
         t.generate(make_context(), tmp_path)
         content = (tmp_path / "AGENTS.md").read_text()
         assert "FastAPI REST API" in content
 
-    def test_content_contains_tech_stack(self, tmp_path: Path) -> None:
+    def test_agents_md_contains_tech_stack(self, tmp_path: Path) -> None:
         t = CodexTarget()
         t.generate(make_context(), tmp_path)
         content = (tmp_path / "AGENTS.md").read_text()
         assert "FastAPI" in content
         assert "Python" in content
 
-    def test_content_contains_tasks(self, tmp_path: Path) -> None:
-        t = CodexTarget()
-        t.generate(make_context(), tmp_path)
-        content = (tmp_path / "AGENTS.md").read_text()
-        assert "Set up project scaffold" in content
-        assert "Implement JWT middleware" in content
-
-    def test_content_contains_constraints(self, tmp_path: Path) -> None:
+    def test_agents_md_contains_constraints(self, tmp_path: Path) -> None:
         t = CodexTarget()
         t.generate(make_context(), tmp_path)
         content = (tmp_path / "AGENTS.md").read_text()
         assert "Must run offline" in content
 
-    def test_content_has_agent_instructions_header(self, tmp_path: Path) -> None:
+    def test_agents_md_has_agent_instructions_header(self, tmp_path: Path) -> None:
         t = CodexTarget()
         t.generate(make_context(), tmp_path)
         content = (tmp_path / "AGENTS.md").read_text()
         assert "# Agent Instructions" in content
 
-    def test_done_task_marked(self, tmp_path: Path) -> None:
+    def test_tasks_md_contains_tasks(self, tmp_path: Path) -> None:
         t = CodexTarget()
         t.generate(make_context(), tmp_path)
-        content = (tmp_path / "AGENTS.md").read_text()
+        content = (tmp_path / "TASKS.md").read_text()
+        assert "Set up project scaffold" in content
+        assert "Implement JWT middleware" in content
+
+    def test_tasks_md_done_task_marked(self, tmp_path: Path) -> None:
+        t = CodexTarget()
+        t.generate(make_context(), tmp_path)
+        content = (tmp_path / "TASKS.md").read_text()
         assert "[x]" in content  # "Write tests" is done=True
+
+    def test_tasks_md_has_tasks_header(self, tmp_path: Path) -> None:
+        t = CodexTarget()
+        t.generate(make_context(), tmp_path)
+        content = (tmp_path / "TASKS.md").read_text()
+        assert "# Tasks" in content
+
+    def test_tasks_md_no_tasks_fallback(self, tmp_path: Path) -> None:
+        ctx = HandoverContext(goal="Simple goal")
+        CodexTarget().generate(ctx, tmp_path)
+        content = (tmp_path / "TASKS.md").read_text()
+        assert "No tasks extracted" in content
 
     def test_name_property(self) -> None:
         assert CodexTarget().name == "codex"
+
+    def test_describe_returns_metadata(self) -> None:
+        desc = CodexTarget().describe()
+        assert desc["name"] == "codex"
+        assert "description" in desc
+        assert len(desc["description"]) > 0
 
     def test_creates_output_dir(self, tmp_path: Path) -> None:
         new_dir = tmp_path / "nested" / "out"
         CodexTarget().generate(make_context(), new_dir)
         assert (new_dir / "AGENTS.md").exists()
+        assert (new_dir / "TASKS.md").exists()
 
     def test_empty_context_renders(self, tmp_path: Path) -> None:
         t = CodexTarget()
         t.generate(HandoverContext(), tmp_path)
         assert (tmp_path / "AGENTS.md").exists()
+        assert (tmp_path / "TASKS.md").exists()
 
 
 # ---------------------------------------------------------------------------
@@ -366,6 +400,94 @@ class TestGooseTarget:
 
 
 # ---------------------------------------------------------------------------
+# CopilotTarget
+# ---------------------------------------------------------------------------
+
+
+class TestCopilotTarget:
+    _OUTPUT = Path(".github") / "copilot-instructions.md"
+
+    def test_generates_copilot_instructions(self, tmp_path: Path) -> None:
+        CopilotTarget().generate(make_context(), tmp_path)
+        assert (tmp_path / self._OUTPUT).exists()
+
+    def test_returns_correct_path(self, tmp_path: Path) -> None:
+        paths = CopilotTarget().generate(make_context(), tmp_path)
+        assert len(paths) == 1
+        assert paths[0] == tmp_path / self._OUTPUT
+
+    def test_dry_run_no_files_written(self, tmp_path: Path) -> None:
+        CopilotTarget().generate(make_context(), tmp_path, dry_run=True)
+        assert not (tmp_path / self._OUTPUT).exists()
+
+    def test_dry_run_returns_path(self, tmp_path: Path) -> None:
+        paths = CopilotTarget().generate(make_context(), tmp_path, dry_run=True)
+        assert paths[0] == tmp_path / self._OUTPUT
+
+    def test_content_contains_goal(self, tmp_path: Path) -> None:
+        CopilotTarget().generate(make_context(), tmp_path)
+        content = (tmp_path / self._OUTPUT).read_text()
+        assert "FastAPI REST API" in content
+
+    def test_content_contains_tech_stack(self, tmp_path: Path) -> None:
+        CopilotTarget().generate(make_context(), tmp_path)
+        content = (tmp_path / self._OUTPUT).read_text()
+        assert "Python" in content
+        assert "FastAPI" in content
+
+    def test_content_contains_decisions(self, tmp_path: Path) -> None:
+        CopilotTarget().generate(make_context(), tmp_path)
+        content = (tmp_path / self._OUTPUT).read_text()
+        assert "JWT tokens" in content
+        assert "PostgreSQL" in content
+
+    def test_content_contains_constraints(self, tmp_path: Path) -> None:
+        CopilotTarget().generate(make_context(), tmp_path)
+        content = (tmp_path / self._OUTPUT).read_text()
+        assert "Must run offline" in content
+
+    def test_content_contains_non_goals(self, tmp_path: Path) -> None:
+        CopilotTarget().generate(make_context(), tmp_path)
+        content = (tmp_path / self._OUTPUT).read_text()
+        assert "Mobile app" in content
+
+    def test_content_contains_tasks(self, tmp_path: Path) -> None:
+        CopilotTarget().generate(make_context(), tmp_path)
+        content = (tmp_path / self._OUTPUT).read_text()
+        assert "Set up project scaffold" in content
+        assert "Implement JWT middleware" in content
+
+    def test_content_has_copilot_header(self, tmp_path: Path) -> None:
+        CopilotTarget().generate(make_context(), tmp_path)
+        content = (tmp_path / self._OUTPUT).read_text()
+        assert "# Copilot Instructions" in content
+
+    def test_creates_github_subdir(self, tmp_path: Path) -> None:
+        CopilotTarget().generate(make_context(), tmp_path)
+        assert (tmp_path / ".github").is_dir()
+
+    def test_creates_output_dir(self, tmp_path: Path) -> None:
+        new_dir = tmp_path / "nested" / "out"
+        CopilotTarget().generate(make_context(), new_dir)
+        assert (new_dir / self._OUTPUT).exists()
+
+    def test_name_property(self) -> None:
+        assert CopilotTarget().name == "copilot"
+
+    def test_describe_returns_metadata(self) -> None:
+        desc = CopilotTarget().describe()
+        assert desc["name"] == "copilot"
+        assert "copilot-instructions.md" in desc["description"]
+
+    def test_empty_context_renders(self, tmp_path: Path) -> None:
+        CopilotTarget().generate(HandoverContext(), tmp_path)
+        assert (tmp_path / self._OUTPUT).exists()
+
+    def test_in_registry(self) -> None:
+        assert isinstance(get_target("copilot"), CopilotTarget)
+
+
+# ---------------------------------------------------------------------------
 # CLI integration tests
 # ---------------------------------------------------------------------------
 
@@ -387,7 +509,7 @@ class TestCLITargetFlag:
         assert (tmp_path / "CLAUDE.md").exists()
         assert (tmp_path / "PLAN.md").exists()
 
-    def test_target_codex_writes_agents_md(self, tmp_path: Path) -> None:
+    def test_target_codex_writes_agents_and_tasks_md(self, tmp_path: Path) -> None:
         runner = CliRunner()
         result = runner.invoke(
             main,
@@ -403,6 +525,7 @@ class TestCLITargetFlag:
         )
         assert result.exit_code == 0, result.output
         assert (tmp_path / "AGENTS.md").exists()
+        assert (tmp_path / "TASKS.md").exists()
 
     def test_target_aider_writes_conf(self, tmp_path: Path) -> None:
         runner = CliRunner()
@@ -438,6 +561,23 @@ class TestCLITargetFlag:
         assert result.exit_code == 0, result.output
         assert (tmp_path / "goose-context.json").exists()
 
+    def test_target_copilot_writes_instructions(self, tmp_path: Path) -> None:
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            [
+                "--input",
+                str(FIXTURES / "claude_single.json"),
+                "--output",
+                str(tmp_path),
+                "--no-llm",
+                "--target",
+                "copilot",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert (tmp_path / ".github" / "copilot-instructions.md").exists()
+
     def test_target_all_writes_all_formats(self, tmp_path: Path) -> None:
         runner = CliRunner()
         result = runner.invoke(
@@ -455,8 +595,10 @@ class TestCLITargetFlag:
         assert result.exit_code == 0, result.output
         assert (tmp_path / "CLAUDE.md").exists()
         assert (tmp_path / "AGENTS.md").exists()
+        assert (tmp_path / "TASKS.md").exists()
         assert (tmp_path / ".aider.conf.yml").exists()
         assert (tmp_path / "goose-context.json").exists()
+        assert (tmp_path / ".github" / "copilot-instructions.md").exists()
 
     def test_dry_run_with_target_claude_code(self, tmp_path: Path) -> None:
         runner = CliRunner()
@@ -494,7 +636,9 @@ class TestCLITargetFlag:
         )
         assert result.exit_code == 0, result.output
         assert not (tmp_path / "AGENTS.md").exists()
+        assert not (tmp_path / "TASKS.md").exists()
         assert "AGENTS.md" in result.output
+        assert "TASKS.md" in result.output
 
     def test_dry_run_with_target_all(self, tmp_path: Path) -> None:
         runner = CliRunner()
@@ -515,13 +659,15 @@ class TestCLITargetFlag:
         # No files written
         assert not (tmp_path / "CLAUDE.md").exists()
         assert not (tmp_path / "AGENTS.md").exists()
-        # But all names shown
+        # But all names shown (relative paths)
         assert "CLAUDE.md" in result.output
         assert "AGENTS.md" in result.output
+        assert "TASKS.md" in result.output
         assert ".aider.conf.yml" in result.output
         assert "goose-context.json" in result.output
+        assert "copilot-instructions.md" in result.output
 
-    def test_target_codex_output_mentions_codex(self, tmp_path: Path) -> None:
+    def test_target_codex_output_mentions_files(self, tmp_path: Path) -> None:
         runner = CliRunner()
         result = runner.invoke(
             main,
@@ -536,6 +682,7 @@ class TestCLITargetFlag:
             ],
         )
         assert "AGENTS.md" in result.output
+        assert "TASKS.md" in result.output
 
     def test_invalid_target_shows_error(self, tmp_path: Path) -> None:
         runner = CliRunner()

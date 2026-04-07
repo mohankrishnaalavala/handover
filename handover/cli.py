@@ -19,6 +19,11 @@ from pathlib import Path
 import click
 
 from handover import __version__
+from handover.targets import list_targets
+
+# Build valid --target choices dynamically from the registry so that
+# newly registered targets are automatically accepted without editing cli.py.
+_TARGET_CHOICES: list[str] = list_targets() + ["all"]
 
 
 @click.group(invoke_without_command=True)
@@ -82,10 +87,10 @@ from handover import __version__
 )
 @click.option(
     "--target",
-    type=click.Choice(["claude-code", "codex", "aider", "goose", "all"]),
+    type=click.Choice(_TARGET_CHOICES),
     default="claude-code",
     show_default=True,
-    help="Output target format. 'all' writes every format.",
+    help="Output target (coding agent). 'all' writes every registered format.",
 )
 @click.option(
     "--publish",
@@ -113,14 +118,18 @@ def main(
 
     Design in chat. Build in terminal. Zero context lost.
 
-    Parse a chat export and generate context files for your terminal coding agent.
-    Supports Claude Code (default), Codex, aider, and Goose output formats.
+    Parse a chat export and generate agent-specific context files for your local
+    coding agent. Each target produces the file(s) that agent expects:
+    Claude Code (CLAUDE.md + PLAN.md), Codex (AGENTS.md + TASKS.md),
+    Copilot (.github/copilot-instructions.md), aider, Goose, and more.
 
     Examples:
 
       handover --input chat.json --output ./my-project/
 
       handover --input chat.json --output ./my-project/ --target codex
+
+      handover --input chat.json --output ./my-project/ --target copilot
 
       handover --input export.jsonl --title "API Design" --output ./my-project/
 
@@ -246,13 +255,13 @@ def main(
         for t_name in targets_to_run:
             paths = _make_target(t_name).generate(context, output_path, dry_run=True)
             for p in paths:
-                click.echo(f"  -> {p.name}")
+                click.echo(f"  -> {p.relative_to(output_path)}")
         click.echo("\nRun without --dry-run to write files.")
     else:
         all_paths: list[Path] = []
         for t_name in targets_to_run:
             all_paths.extend(_make_target(t_name).generate(context, output_path, dry_run=False))
-        names = ", ".join(p.name for p in all_paths)
+        names = ", ".join(str(p.relative_to(output_path)) for p in all_paths)
         click.echo(f"Wrote {names} to {output_path}/")
 
         # Record to history

@@ -19,6 +19,7 @@ from handover.targets.aider import AiderTarget
 from handover.targets.base import BaseTarget
 from handover.targets.claude_code import ClaudeCodeTarget
 from handover.targets.codex import CodexTarget
+from handover.targets.copilot import CopilotTarget
 from handover.targets.goose import GooseTarget
 
 TARGET_REGISTRY: dict[str, type[BaseTarget]] = {
@@ -26,6 +27,7 @@ TARGET_REGISTRY: dict[str, type[BaseTarget]] = {
     "codex": CodexTarget,
     "aider": AiderTarget,
     "goose": GooseTarget,
+    "copilot": CopilotTarget,
 }
 
 
@@ -63,6 +65,7 @@ __all__ = [
     "CodexTarget",
     "AiderTarget",
     "GooseTarget",
+    "CopilotTarget",
     "TARGET_REGISTRY",
     "get_target",
     "list_targets",

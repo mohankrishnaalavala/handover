@@ -2,16 +2,19 @@
 
 Target adapters let handover generate output for any terminal coding agent from the same `HandoverContext`. This guide walks you through adding a new target in three steps.
 
+`handover` follows a simple principle: **shared semantic extraction, target-specific artifact generation**. The parser and summarizer extract goal, tasks, decisions, and constraints once. Each target adapter decides how to express that context for its coding agent — including which filenames to use, how many files to emit, and what format each file takes.
+
 ## Overview
 
-Targets live in `handover/targets/`. Each adapter subclasses `BaseTarget` and is registered in `TARGET_REGISTRY`. The `--target` CLI flag selects which adapter to use.
+Targets live in `handover/targets/`. Each adapter subclasses `BaseTarget` and is registered in `TARGET_REGISTRY`. The `--target` CLI flag selects which adapter to use, and its choices are derived dynamically from the registry — adding a new target here automatically makes it available in the CLI.
 
 ```
 handover/targets/
 ├── __init__.py       # registry + get_target() / list_targets()
 ├── base.py           # BaseTarget abstract class
 ├── claude_code.py    # Claude Code: CLAUDE.md + PLAN.md
-├── codex.py          # Codex CLI: AGENTS.md
+├── codex.py          # Codex CLI: AGENTS.md + TASKS.md
+├── copilot.py        # GitHub Copilot: .github/copilot-instructions.md
 ├── aider.py          # aider: .aider.conf.yml
 └── goose.py          # Goose: goose-context.json
 ```
@@ -69,7 +72,35 @@ class YourAgentTarget(BaseTarget):
 - Use stdlib only (no new `dependencies` in `pyproject.toml`). JSON → `json.dumps`, YAML → string template.
 - Type hints required on all public methods.
 - Docstrings required on all public methods.
-- Return `[output_path]` in both dry_run and non-dry_run cases. Only skip writing when `dry_run=True`.
+- Return `[output_path]` (or multiple paths) in both dry_run and non-dry_run cases. Only skip writing when `dry_run=True`.
+- If your target writes into a subdirectory (e.g. `.github/`), create it inside `output_dir` — the returned paths must be absolute (under `output_dir`).
+
+### Optional: override `describe()`
+
+`BaseTarget` provides a default `describe()` that returns `{"name": self.name, "description": ""}`. Override it to give users richer introspection:
+
+```python
+def describe(self) -> dict[str, str]:
+    return {
+        "name": "your-agent",
+        "description": "YourAgent — generates your-agent-context.md",
+    }
+```
+
+### Multi-file targets
+
+A target can generate any number of files. Just return all paths from `generate()`:
+
+```python
+def generate(self, context, output_dir, dry_run=False):
+    file_a = output_dir / "SPEC.md"
+    file_b = output_dir / "TASKS.md"
+    if not dry_run:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        file_a.write_text(self._render_spec(context), encoding="utf-8")
+        file_b.write_text(self._render_tasks(context), encoding="utf-8")
+    return [file_a, file_b]
+```
 
 ---
 
@@ -85,6 +116,7 @@ TARGET_REGISTRY: dict[str, type[BaseTarget]] = {
     "codex": CodexTarget,
     "aider": AiderTarget,
     "goose": GooseTarget,
+    "copilot": CopilotTarget,
     "your-agent": YourAgentTarget,  # add this
 }
 ```

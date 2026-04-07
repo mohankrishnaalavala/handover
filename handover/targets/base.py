@@ -43,3 +43,14 @@ class BaseTarget(ABC):
             List of Paths that were (or would be) written.
         """
         ...
+
+    def describe(self) -> dict[str, str]:
+        """
+        Return human-readable metadata about this target.
+
+        Override to provide a richer description for help text or introspection.
+
+        Returns:
+            A dict with at minimum 'name' and 'description' keys.
+        """
+        return {"name": self.name, "description": ""}

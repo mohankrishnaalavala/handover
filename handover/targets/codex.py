@@ -1,17 +1,16 @@
 """
 handover/targets/codex.py
 
-Target adapter for OpenAI Codex CLI: generates AGENTS.md.
+Target adapter for OpenAI Codex CLI: generates AGENTS.md and TASKS.md.
 
-Format:
-  # Agent Instructions
-  ## Goal
-  ## Tech Stack
-  ## Tasks
-  ## Constraints
-  ## Open Questions
+AGENTS.md — project context: goal, tech stack, constraints, open questions.
+TASKS.md  — implementation task list with status checkboxes.
+
+These are product conventions defined by handover; AGENTS.md aligns with the
+filename used by the Codex CLI for agent instructions.
 
 Phase 5 — Multi-Target Agents.
+Phase 6 — Agent-Aware Output (TASKS.md added).
 """
 
 from __future__ import annotations
@@ -21,16 +20,24 @@ from pathlib import Path
 from handover.models import HandoverContext
 from handover.targets.base import BaseTarget
 
-_OUTPUT_FILENAME = "AGENTS.md"
+_AGENTS_FILENAME = "AGENTS.md"
+_TASKS_FILENAME = "TASKS.md"
 
 
 class CodexTarget(BaseTarget):
-    """Generates AGENTS.md for OpenAI Codex CLI."""
+    """Generates AGENTS.md and TASKS.md for OpenAI Codex CLI."""
 
     @property
     def name(self) -> str:
         """Target identifier: 'codex'."""
         return "codex"
+
+    def describe(self) -> dict[str, str]:
+        """Return human-readable metadata about this target."""
+        return {
+            "name": "codex",
+            "description": "OpenAI Codex CLI — generates AGENTS.md (context) and TASKS.md (task list)",
+        }
 
     def generate(
         self,
@@ -39,24 +46,26 @@ class CodexTarget(BaseTarget):
         dry_run: bool = False,
     ) -> list[Path]:
         """
-        Generate AGENTS.md from the HandoverContext.
+        Generate AGENTS.md and TASKS.md from the HandoverContext.
 
         Args:
             context: Populated HandoverContext.
-            output_dir: Directory to write the output file.
-            dry_run: If True, return expected path without writing.
+            output_dir: Directory to write the output files.
+            dry_run: If True, return expected paths without writing.
 
         Returns:
-            [output_dir/AGENTS.md]
+            [output_dir/AGENTS.md, output_dir/TASKS.md]
         """
-        output_path = output_dir / _OUTPUT_FILENAME
+        agents_path = output_dir / _AGENTS_FILENAME
+        tasks_path = output_dir / _TASKS_FILENAME
         if not dry_run:
             output_dir.mkdir(parents=True, exist_ok=True)
-            output_path.write_text(self._render(context), encoding="utf-8")
-        return [output_path]
+            agents_path.write_text(self._render_agents(context), encoding="utf-8")
+            tasks_path.write_text(self._render_tasks(context), encoding="utf-8")
+        return [agents_path, tasks_path]
 
-    def _render(self, context: HandoverContext) -> str:
-        """Render the AGENTS.md content from context."""
+    def _render_agents(self, context: HandoverContext) -> str:
+        """Render AGENTS.md — project context for Codex CLI."""
         lines: list[str] = ["# Agent Instructions", ""]
 
         lines += ["## Goal", context.goal or "(none)", ""]
@@ -67,13 +76,13 @@ class CodexTarget(BaseTarget):
                 lines.append(f"- **{key}**: {value}")
             lines.append("")
 
-        if context.tasks:
-            lines.append("## Tasks")
-            for i, task in enumerate(context.tasks, 1):
-                status = "[x]" if task.done else "[ ]"
-                lines.append(f"{i}. {status} {task.title}")
-                if task.description:
-                    lines.append(f"   {task.description}")
+        if context.decisions:
+            lines.append("## Key Decisions")
+            for decision in context.decisions:
+                entry = f"- **{decision.topic}**: {decision.decision}"
+                if decision.rationale:
+                    entry += f" _{decision.rationale}_"
+                lines.append(entry)
             lines.append("")
 
         if context.constraints:
@@ -87,5 +96,22 @@ class CodexTarget(BaseTarget):
             for question in context.open_questions:
                 lines.append(f"- {question}")
             lines.append("")
+
+        return "\n".join(lines)
+
+    def _render_tasks(self, context: HandoverContext) -> str:
+        """Render TASKS.md — implementation task list for Codex CLI."""
+        lines: list[str] = ["# Tasks", ""]
+
+        if context.tasks:
+            for i, task in enumerate(context.tasks, 1):
+                status = "[x]" if task.done else "[ ]"
+                priority = f" _(high priority)_" if task.priority == "high" else ""
+                lines.append(f"{i}. {status} {task.title}{priority}")
+                if task.description:
+                    lines.append(f"   {task.description}")
+            lines.append("")
+        else:
+            lines += ["_(No tasks extracted from conversation.)_", ""]
 
         return "\n".join(lines)
