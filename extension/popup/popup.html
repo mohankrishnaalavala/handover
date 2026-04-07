@@ -12,7 +12,7 @@
     <span class="tagline">Design in chat. Build in terminal.</span>
   </div>
 
-  <!-- ── Primary action: export JSON (claude.ai only) ────────────────── -->
+  <!-- ── Primary action: export JSON (Claude + ChatGPT) ──────────────── -->
   <button id="btn-export" class="primary">
     Export Chat as JSON
   </button>
@@ -38,6 +38,12 @@
     <label for="port">Server port</label>
     <input id="port" type="number" value="7437" min="1024" max="65535" />
   </div>
+
+  <button id="btn-save" class="secondary">
+    Save Chat JSON to Project
+  </button>
+
+  <div id="status-save" class="status hidden"></div>
 
   <button id="btn-handover" class="secondary">
     Generate handover artifacts

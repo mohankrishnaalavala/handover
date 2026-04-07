@@ -5,9 +5,10 @@ Local HTTP bridge for the handover browser extension.
 See Phase 3 roadmap — handover serve.
 
 Endpoints:
-  GET  /health   — liveness check, returns version
-  POST /handover — run full pipeline from raw conversation JSON
-  POST /config   — update output_dir and no_llm settings
+  GET  /health      — liveness check, returns version
+  POST /handover    — run full pipeline from raw conversation JSON
+  POST /save-chat   — save raw conversation JSON to output_dir (no pipeline)
+  POST /config      — update output_dir and no_llm settings
 
 Port 7437 spells H-A-N-D on a phone keypad.
 """
@@ -110,6 +111,8 @@ class HandoverHandler(BaseHTTPRequestHandler):
 
         if path == "/handover":
             self._handle_handover(data)
+        elif path == "/save-chat":
+            self._handle_save_chat(data)
         elif path == "/config":
             self._handle_config(data)
         else:
@@ -118,6 +121,44 @@ class HandoverHandler(BaseHTTPRequestHandler):
     # ------------------------------------------------------------------
     # Endpoint implementations
     # ------------------------------------------------------------------
+
+    def _handle_save_chat(self, data: dict[str, Any]) -> None:
+        """
+        Save raw conversation JSON to output_dir without running the pipeline.
+
+        Writes [conversation] as handover-chat-<uuid>.json so the file is
+        immediately consumable by the CLI:
+
+            handover --input handover-chat-<uuid>.json --output <dir> --target <agent>
+
+        Returns:
+            { status, path, cli_hint }
+        """
+        conversation = data.get("conversation")
+        if not conversation:
+            self._send_json(
+                400, {"status": "error", "message": "'conversation' field is required"}
+            )
+            return
+
+        output_dir, _ = _config.snapshot()
+        out = Path(output_dir)
+        out.mkdir(parents=True, exist_ok=True)
+
+        uuid = conversation.get("uuid") or conversation.get("id") or "export"
+        filename = f"handover-chat-{uuid}.json"
+        file_path = out / filename
+        file_path.write_text(json.dumps([conversation], indent=2), encoding="utf-8")
+
+        cli_hint = f"handover --input {file_path} --output {output_dir} --no-llm"
+        self._send_json(
+            200,
+            {
+                "status": "ok",
+                "path": str(file_path),
+                "cli_hint": cli_hint,
+            },
+        )
 
     def _handle_config(self, data: dict[str, Any]) -> None:
         """Update server configuration."""

@@ -3,9 +3,15 @@
  *
  * Two buttons:
  *   btn-export   → "Export Chat as JSON"
- *                  Claude.ai only — calls background {action:"export"} → downloads
- *                  handover-chat-<uuid>.json via claude.ai API
+ *                  Claude.ai + ChatGPT — calls background {action:"export"} → downloads
+ *                  handover-chat-<uuid>.json as a CLI-ready JSON array
  *                  Shows: filename + CLI command to run locally
+ *
+ *   btn-save     → "Save Chat JSON to Project" (requires handover serve)
+ *                  Supported on claude.ai and chatgpt.com / chat.openai.com
+ *                  Calls background {action:"save"} → POSTs to /save-chat
+ *                  Server writes handover-chat-<uuid>.json to output_dir
+ *                  Shows: saved path + CLI command to run any target
  *
  *   btn-handover → "Generate handover artifacts" (requires handover serve)
  *                  Supported on claude.ai and chatgpt.com / chat.openai.com
@@ -21,8 +27,10 @@ const DEFAULT_PORT = 7437;
 
 // DOM refs
 const btnExport = document.getElementById("btn-export");
+const btnSave = document.getElementById("btn-save");
 const btnHandover = document.getElementById("btn-handover");
 const statusExport = document.getElementById("status-export");
+const statusSave = document.getElementById("status-save");
 const statusHandover = document.getElementById("status-handover");
 const outputDirInput = document.getElementById("output-dir");
 const portInput = document.getElementById("port");
@@ -82,7 +90,7 @@ portInput.addEventListener("change", saveSettings);
 
 btnExport.addEventListener("click", async () => {
   setLoading(btnExport, true, "Export Chat as JSON");
-  showStatus(statusExport, "Fetching conversation from claude.ai API…", "info");
+  showStatus(statusExport, "Fetching conversation…", "info");
 
   try {
     const tab = await getActiveTab();
@@ -137,6 +145,65 @@ btnExport.addEventListener("click", async () => {
     showStatus(statusExport, err.message || "Unexpected error.", "error");
   } finally {
     setLoading(btnExport, false, "Export Chat as JSON");
+  }
+});
+
+// ─── Save Chat JSON to Project ───────────────────────────────────────────────
+
+btnSave.addEventListener("click", async () => {
+  saveSettings();
+  setLoading(btnSave, true, "Save Chat JSON to Project");
+  showStatus(statusSave, "Extracting conversation…", "info");
+
+  try {
+    const tab = await getActiveTab();
+    if (!tab?.id) {
+      showStatus(statusSave, "Could not determine active tab.", "error");
+      return;
+    }
+    if (!isSupportedPage(tab.url)) {
+      showStatus(
+        statusSave,
+        "Navigate to a claude.ai or chatgpt.com conversation first.",
+        "error"
+      );
+      return;
+    }
+
+    showStatus(statusSave, "Saving to project…", "info");
+
+    const response = await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(
+        { action: "save", tabId: tab.id },
+        (resp) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else {
+            resolve(resp);
+          }
+        }
+      );
+    });
+
+    if (response.success) {
+      const { path, cli_hint } = response.result;
+      showStatus(statusSave, `Saved: ${path}`, "success");
+      // Show CLI hint so user can run any target
+      const hint = document.createElement("div");
+      hint.className = "cli-hint";
+      hint.innerHTML =
+        `Run in terminal:<br>` +
+        `<code>${cli_hint}</code>`;
+      const prev = statusSave.nextElementSibling;
+      if (prev?.classList.contains("cli-hint")) prev.remove();
+      statusSave.after(hint);
+    } else {
+      showStatus(statusSave, response.error || "Unknown error.", "error");
+    }
+  } catch (err) {
+    showStatus(statusSave, err.message || "Unexpected error.", "error");
+  } finally {
+    setLoading(btnSave, false, "Save Chat JSON to Project");
   }
 });
 
