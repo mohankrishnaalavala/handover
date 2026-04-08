@@ -126,6 +126,19 @@ class TestLoad:
         entries = load(path=hist)
         assert entries == []
 
+    def test_load_filter_no_sibling_prefix_false_positive(self, tmp_path: Path) -> None:
+        """Sibling dirs with a shared prefix must not match each other."""
+        hist = tmp_path / "history.jsonl"
+        proj = tmp_path / "proj"
+        proj_sibling = tmp_path / "proj-extra"
+        proj.mkdir()
+        proj_sibling.mkdir()
+        record(make_entry(output_dir=str(proj)), path=hist)
+        record(make_entry(handover_id="h_sibling00", output_dir=str(proj_sibling)), path=hist)
+        entries = load(output_dir=str(proj), path=hist)
+        assert len(entries) == 1
+        assert entries[0].output_dir == str(proj)
+
 
 # ---------------------------------------------------------------------------
 # get_by_id

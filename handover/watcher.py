@@ -29,10 +29,12 @@ class _SessionEventHandler:
 
     def __init__(
         self,
+        project_dir: Path,
         output_dir: Path,
         no_llm: bool,
         idle_seconds: int,
     ) -> None:
+        self._project_dir = project_dir
         self._output_dir = output_dir
         self._no_llm = no_llm
         self._idle_seconds = idle_seconds
@@ -75,7 +77,7 @@ class _SessionEventHandler:
 
             context = reverse(
                 session_file=session_file,
-                project_dir=self._output_dir,
+                project_dir=self._project_dir,
                 use_llm=not self._no_llm,
             )
             gen = Generator()
@@ -112,6 +114,7 @@ def start_watching(
     sessions_root.mkdir(parents=True, exist_ok=True)
 
     debouncer = _SessionEventHandler(
+        project_dir=project_dir,
         output_dir=output_dir,
         no_llm=no_llm,
         idle_seconds=idle_seconds,

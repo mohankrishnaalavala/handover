@@ -862,7 +862,7 @@ def rerun_handover(handover_id: str) -> None:
     if not entry.use_llm:
         args.append("--no-llm")
 
-    runner = CliRunner(mix_stderr=False)  # type: ignore[call-arg]
+    runner = CliRunner()
     result = runner.invoke(main, args, catch_exceptions=False)
     click.echo(result.output)
     if result.exit_code != 0:
@@ -901,7 +901,7 @@ def rerun_handover(handover_id: str) -> None:
 )
 @click.option(
     "--target",
-    type=click.Choice(["claude-code", "codex", "aider", "goose", "all"]),
+    type=click.Choice(_TARGET_CHOICES),
     default="claude-code",
     show_default=True,
     help="Output target format",

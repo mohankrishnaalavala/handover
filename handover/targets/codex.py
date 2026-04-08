@@ -36,7 +36,9 @@ class CodexTarget(BaseTarget):
         """Return human-readable metadata about this target."""
         return {
             "name": "codex",
-            "description": "OpenAI Codex CLI — generates AGENTS.md (context) and TASKS.md (task list)",
+            "description": (
+                "OpenAI Codex CLI — generates AGENTS.md (context) and TASKS.md (task list)"
+            ),
         }
 
     def generate(
@@ -106,7 +108,7 @@ class CodexTarget(BaseTarget):
         if context.tasks:
             for i, task in enumerate(context.tasks, 1):
                 status = "[x]" if task.done else "[ ]"
-                priority = f" _(high priority)_" if task.priority == "high" else ""
+                priority = " _(high priority)_" if task.priority == "high" else ""
                 lines.append(f"{i}. {status} {task.title}{priority}")
                 if task.description:
                     lines.append(f"   {task.description}")

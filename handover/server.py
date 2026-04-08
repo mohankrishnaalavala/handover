@@ -136,9 +136,7 @@ class HandoverHandler(BaseHTTPRequestHandler):
         """
         conversation = data.get("conversation")
         if not conversation:
-            self._send_json(
-                400, {"status": "error", "message": "'conversation' field is required"}
-            )
+            self._send_json(400, {"status": "error", "message": "'conversation' field is required"})
             return
 
         output_dir, _ = _config.snapshot()
@@ -230,6 +228,7 @@ class HandoverHandler(BaseHTTPRequestHandler):
                 200,
                 {
                     "status": "ok",
+                    "output_dir": str(out),
                     "claude_md": str(out / "CLAUDE.md"),
                     "plan_md": str(out / "PLAN.md"),
                 },

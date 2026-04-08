@@ -164,6 +164,8 @@ def test_handover_success(server: Any, tmp_path: Path) -> None:
 
     assert status == 200
     assert data["status"] == "ok"
+    assert "output_dir" in data
+    assert data["output_dir"] == str(tmp_path)
     assert "claude_md" in data
     assert "plan_md" in data
     assert str(tmp_path) in data["claude_md"]
