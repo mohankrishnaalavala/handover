@@ -2,7 +2,9 @@
 
 > *Design in chat. Build in terminal. Zero context lost.*
 
-`handover` is an open-source CLI tool that bridges AI chat interfaces (Claude, ChatGPT, Gemini, and others) to local terminal coding agents (Claude Code, Codex CLI, Aider, Goose, etc.). It extracts decisions, plans, and intent from a chat conversation and generates structured handover artifacts that a local agent can immediately act on — without re-explaining anything.
+`handover` is an open-source CLI tool that bridges AI chat interfaces (Claude, ChatGPT, Gemini, and others) to local terminal coding agents (Claude Code, Codex CLI, Copilot, Aider, Goose, etc.). It extracts decisions, plans, and intent from a chat conversation and generates **agent-specific** handover artifacts — the exact files each coding agent expects — so a local agent can immediately act on your intent without re-explaining anything.
+
+Each target adapter knows what its agent needs: Claude Code gets `CLAUDE.md` + `PLAN.md`, Codex gets `AGENTS.md` + `TASKS.md`, Copilot gets `.github/copilot-instructions.md`, and so on. The parsing and extraction happen once; each target decides how to express the result.
 
 [![PyPI version](https://img.shields.io/pypi/v/handover.svg)](https://pypi.org/project/handover/)
 [![Python versions](https://img.shields.io/pypi/pyversions/handover.svg)](https://pypi.org/project/handover/)
@@ -79,18 +81,22 @@ Run without --dry-run to write files.
 
 ---
 
-## Output Targets
+## Agent-Aware Output
+
+`handover` parses your chat once and generates the files your chosen coding agent expects. Each target adapter owns its own filenames and format — Claude is one target, not the default mental model for the whole product.
 
 | Target | Generated Files | Agent |
 |--------|----------------|-------|
 | `claude-code` (default) | `CLAUDE.md` + `PLAN.md` | Claude Code |
-| `codex` | `AGENTS.md` | Codex CLI |
+| `codex` | `AGENTS.md` + `TASKS.md` | Codex CLI |
+| `copilot` | `.github/copilot-instructions.md` | GitHub Copilot |
 | `aider` | `.aider.conf.yml` | Aider |
 | `goose` | `goose-context.json` | Goose |
 | `all` | All of the above | All agents |
 
 ```bash
 handover --input chat.json --output ./my-project/ --target codex
+handover --input chat.json --output ./my-project/ --target copilot
 handover --input chat.json --output ./my-project/ --target all
 ```
 
@@ -111,7 +117,7 @@ handover --input <file> --output <dir> [OPTIONS]
 | `--source` | auto | Force parser: `claude`, `chatgpt`, `gemini`, `perplexity` |
 | `--title` | — | Select conversation by title (substring match, for bulk exports) |
 | `--id` | — | Select conversation by ID (for bulk exports) |
-| `--target` | `claude-code` | Output format: `claude-code`, `codex`, `aider`, `goose`, `all` |
+| `--target` | `claude-code` | Output target (coding agent): `claude-code`, `codex`, `copilot`, `aider`, `goose`, `all` |
 | `--no-llm` | off | Rule-based extraction only — no API key required |
 | `--dry-run` | off | Preview what would be written, without writing |
 | `--launch` | off | Run `claude` in output directory after writing |

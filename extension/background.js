@@ -68,7 +68,9 @@ async function handleExport(tabId) {
 
   // conv = { uuid, name, chat_messages: [...] }
   const filename = `handover-chat-${conv.uuid || "export"}.json`;
-  const json = JSON.stringify(conv, null, 2);
+  // Wrap in array so ClaudeParser can consume the file directly via CLI:
+  // handover --input handover-chat-<uuid>.json --output ./my-project/
+  const json = JSON.stringify([conv], null, 2);
   // Use a data: URL — Blob/URL.createObjectURL is not available in MV3 service workers
   const dataUrl =
     "data:application/json;charset=utf-8," + encodeURIComponent(json);
@@ -119,6 +121,40 @@ async function handleHandover(tabId, port, outputDir) {
   return postToServer(port, outputDir, payload);
 }
 
+// ─── save-chat action ─────────────────────────────────────────────────────────
+
+/**
+ * Extract the conversation and POST it to /save-chat on the local server.
+ * The server saves handover-chat-<uuid>.json to output_dir so the user can
+ * run any CLI target against it:
+ *   handover --input handover-chat-<uuid>.json --output <dir> --target copilot
+ */
+async function handleSave(tabId, port, outputDir) {
+  if (outputDir) {
+    try {
+      await fetch(`http://localhost:${port}/config`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ output_dir: outputDir }),
+      });
+    } catch (_) {
+      // Non-fatal
+    }
+  }
+
+  const payload = await sendToTab(tabId, { action: "extract" });
+
+  const resp = await fetch(`http://localhost:${port}/save-chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  const result = await resp.json();
+  if (!resp.ok) throw new Error(result.message || `Server error ${resp.status}`);
+  return result;
+}
+
 // ─── message listener ─────────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
@@ -135,6 +171,27 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     // Fetch config first so the configured port is in scope for the error message
     getConfig().then(({ port, outputDir }) => {
       handleHandover(tabId, port, outputDir)
+        .then((result) => sendResponse({ success: true, result }))
+        .catch((err) => {
+          const message = err instanceof Error ? err.message : String(err);
+          const isServerDown =
+            message.includes("Failed to fetch") ||
+            message.includes("NetworkError") ||
+            message.includes("ECONNREFUSED");
+          sendResponse({
+            success: false,
+            error: isServerDown
+              ? `Cannot reach handover server on port ${port}. Run: handover serve`
+              : message,
+          });
+        });
+    });
+    return true;
+  }
+
+  if (action === "save") {
+    getConfig().then(({ port, outputDir }) => {
+      handleSave(tabId, port, outputDir)
         .then((result) => sendResponse({ success: true, result }))
         .catch((err) => {
           const message = err instanceof Error ? err.message : String(err);

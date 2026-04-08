@@ -324,3 +324,28 @@ class TestMultiSourceCLI:
             ],
         )
         assert result.exit_code == 0, result.output
+
+
+class TestMergeCommand:
+    """Regression tests for the merge subcommand."""
+
+    def test_merge_target_copilot_is_accepted(self, tmp_path: Path) -> None:
+        """merge --target copilot must be a valid choice (uses dynamic registry)."""
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            [
+                "merge",
+                "--input",
+                str(FIXTURES / "claude_single.json"),
+                "--input",
+                str(FIXTURES / "claude_single.json"),
+                "--output",
+                str(tmp_path / "out"),
+                "--target",
+                "copilot",
+                "--no-llm",
+                "--dry-run",
+            ],
+        )
+        assert result.exit_code == 0, result.output

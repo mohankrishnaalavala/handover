@@ -65,7 +65,7 @@ def load(
         return []
 
     entries: list[HistoryEntry] = []
-    filter_dir = str(Path(output_dir).resolve()) if output_dir else None
+    filter_path = Path(output_dir).resolve() if output_dir else None
 
     with _path.open("r", encoding="utf-8") as f:
         for line in f:
@@ -75,8 +75,10 @@ def load(
             try:
                 raw = json.loads(line)
                 entry = HistoryEntry(**raw)
-                if filter_dir and not entry.output_dir.startswith(filter_dir):
-                    continue
+                if filter_path is not None:
+                    entry_path = Path(entry.output_dir).resolve()
+                    if entry_path != filter_path and filter_path not in entry_path.parents:
+                        continue
                 entries.append(entry)
             except (json.JSONDecodeError, TypeError):
                 continue  # skip malformed lines

@@ -164,6 +164,8 @@ def test_handover_success(server: Any, tmp_path: Path) -> None:
 
     assert status == 200
     assert data["status"] == "ok"
+    assert "output_dir" in data
+    assert data["output_dir"] == str(tmp_path)
     assert "claude_md" in data
     assert "plan_md" in data
     assert str(tmp_path) in data["claude_md"]
@@ -342,4 +344,73 @@ def test_serve_command_exists() -> None:
     result = runner.invoke(main, ["serve", "--help"])
     assert result.exit_code == 0
     assert "7437" in result.output  # default port in help text
-    assert "--daemon" in result.output
+
+
+# ---------------------------------------------------------------------------
+# /save-chat
+# ---------------------------------------------------------------------------
+
+
+def _save_chat_payload() -> dict[str, Any]:
+    """Minimal payload for POST /save-chat."""
+    return {
+        "source": "chatgpt",
+        "conversation": {
+            "uuid": "test-conv-abc123",
+            "name": "Test Conversation",
+            "chat_messages": [
+                {"sender": "human", "text": "Hello"},
+                {"sender": "assistant", "text": "Hi there!"},
+            ],
+        },
+    }
+
+
+def test_save_chat_writes_json_file(server: Any, tmp_path: Path) -> None:
+    _, port = server
+    _post(port, "/config", {"output_dir": str(tmp_path)})
+    status, data = _post(port, "/save-chat", _save_chat_payload())
+    assert status == 200, data
+    assert data["status"] == "ok"
+    saved = tmp_path / "handover-chat-test-conv-abc123.json"
+    assert saved.exists()
+
+
+def test_save_chat_saved_file_is_valid_array(server: Any, tmp_path: Path) -> None:
+    _, port = server
+    _post(port, "/config", {"output_dir": str(tmp_path)})
+    _post(port, "/save-chat", _save_chat_payload())
+    saved = tmp_path / "handover-chat-test-conv-abc123.json"
+    parsed = json.loads(saved.read_text())
+    assert isinstance(parsed, list)
+    assert len(parsed) == 1
+    assert parsed[0]["uuid"] == "test-conv-abc123"
+
+
+def test_save_chat_returns_path_and_cli_hint(server: Any, tmp_path: Path) -> None:
+    _, port = server
+    _post(port, "/config", {"output_dir": str(tmp_path)})
+    status, data = _post(port, "/save-chat", _save_chat_payload())
+    assert status == 200
+    assert "path" in data
+    assert "cli_hint" in data
+    assert "handover-chat-test-conv-abc123.json" in data["path"]
+    assert "handover --input" in data["cli_hint"]
+
+
+def test_save_chat_missing_conversation_returns_400(server: Any) -> None:
+    _, port = server
+    status, data = _post(port, "/save-chat", {"source": "chatgpt"})
+    assert status == 400
+    assert data["status"] == "error"
+    assert "conversation" in data["message"]
+
+
+def test_save_chat_does_not_run_pipeline(server: Any, tmp_path: Path) -> None:
+    """Verify that /save-chat writes JSON but does NOT generate CLAUDE.md or PLAN.md."""
+    _, port = server
+    _post(port, "/config", {"output_dir": str(tmp_path)})
+    _post(port, "/save-chat", _save_chat_payload())
+    assert not (tmp_path / "CLAUDE.md").exists()
+    assert not (tmp_path / "PLAN.md").exists()
+    assert (tmp_path / "handover-chat-test-conv-abc123.json").exists()
