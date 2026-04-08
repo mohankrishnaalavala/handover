@@ -451,7 +451,9 @@ class TestSessionEventHandler:
     def test_schedules_timer_on_jsonl_file(self, tmp_path: Path) -> None:
         from handover.watcher import _SessionEventHandler
 
-        handler = _SessionEventHandler(project_dir=tmp_path, output_dir=tmp_path, no_llm=True, idle_seconds=9999)
+        handler = _SessionEventHandler(
+            project_dir=tmp_path, output_dir=tmp_path, no_llm=True, idle_seconds=9999
+        )
         handler.on_created("/some/path/session.jsonl")
         assert "/some/path/session.jsonl" in handler._timers
         # Cleanup
@@ -460,14 +462,18 @@ class TestSessionEventHandler:
     def test_ignores_non_jsonl_files(self, tmp_path: Path) -> None:
         from handover.watcher import _SessionEventHandler
 
-        handler = _SessionEventHandler(project_dir=tmp_path, output_dir=tmp_path, no_llm=True, idle_seconds=9999)
+        handler = _SessionEventHandler(
+            project_dir=tmp_path, output_dir=tmp_path, no_llm=True, idle_seconds=9999
+        )
         handler.on_created("/some/path/notes.txt")
         assert len(handler._timers) == 0
 
     def test_resets_timer_on_modify(self, tmp_path: Path) -> None:
         from handover.watcher import _SessionEventHandler
 
-        handler = _SessionEventHandler(project_dir=tmp_path, output_dir=tmp_path, no_llm=True, idle_seconds=9999)
+        handler = _SessionEventHandler(
+            project_dir=tmp_path, output_dir=tmp_path, no_llm=True, idle_seconds=9999
+        )
         handler.on_created("/some/path/session.jsonl")
         first_timer = handler._timers["/some/path/session.jsonl"]
         handler.on_modified("/some/path/session.jsonl")
