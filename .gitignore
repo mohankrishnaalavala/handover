@@ -25,6 +25,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+manual_test/
 
 # Distribution / packaging
 .Python
