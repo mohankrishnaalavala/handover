@@ -138,23 +138,31 @@ def _mock_conversation() -> dict[str, Any]:
 
 def test_handover_success(server: Any, tmp_path: Path) -> None:
     _, port = server
-    _post(port, "/config", {"output_dir": str(tmp_path), "no_llm": True})
+    # Skip scaffold extraction for this orchestration-only test.
+    _post(
+        port,
+        "/config",
+        {"output_dir": str(tmp_path), "no_llm": True, "no_handover_dir": True},
+    )
 
     mock_messages = [MagicMock()]
     mock_context = MagicMock()
     mock_context.source = ""
 
+    mock_target_instance = MagicMock()
+    mock_target_instance.generate.return_value = [tmp_path / "CLAUDE.md", tmp_path / "PLAN.md"]
+
     with (
         patch("handover.server.get_parser") as mock_get_parser,
         patch("handover.server._summarizer.summarize", return_value=mock_context),
-        patch("handover.server.Generator") as mock_gen_cls,
+        patch(
+            "handover.targets.claude_code.ClaudeCodeTarget",
+            return_value=mock_target_instance,
+        ),
     ):
         mock_parser = MagicMock()
         mock_parser.parse.return_value = mock_messages
         mock_get_parser.return_value = mock_parser
-
-        mock_gen = MagicMock()
-        mock_gen_cls.return_value = mock_gen
 
         status, data = _post(
             port,
@@ -173,20 +181,29 @@ def test_handover_success(server: Any, tmp_path: Path) -> None:
 
 def test_handover_sets_source_on_context(server: Any, tmp_path: Path) -> None:
     _, port = server
-    _post(port, "/config", {"output_dir": str(tmp_path), "no_llm": True})
+    _post(
+        port,
+        "/config",
+        {"output_dir": str(tmp_path), "no_llm": True, "no_handover_dir": True},
+    )
 
     mock_context = MagicMock()
     mock_context.source = ""
 
+    mock_target_instance = MagicMock()
+    mock_target_instance.generate.return_value = [tmp_path / "CLAUDE.md"]
+
     with (
         patch("handover.server.get_parser") as mock_get_parser,
         patch("handover.server._summarizer.summarize", return_value=mock_context),
-        patch("handover.server.Generator") as mock_gen_cls,
+        patch(
+            "handover.targets.claude_code.ClaudeCodeTarget",
+            return_value=mock_target_instance,
+        ),
     ):
         mock_parser = MagicMock()
         mock_parser.parse.return_value = [MagicMock()]
         mock_get_parser.return_value = mock_parser
-        mock_gen_cls.return_value = MagicMock()
 
         _post(
             port,
@@ -201,20 +218,29 @@ def test_handover_chatgpt_chat_messages_uses_claude_parser(server: Any, tmp_path
     """Extension sends chatgpt source with pre-processed chat_messages format.
     Server must use ClaudeParser (not ChatGPTParser) to avoid 'mapping' error."""
     _, port = server
-    _post(port, "/config", {"output_dir": str(tmp_path), "no_llm": True})
+    _post(
+        port,
+        "/config",
+        {"output_dir": str(tmp_path), "no_llm": True, "no_handover_dir": True},
+    )
 
     mock_context = MagicMock()
     mock_context.source = ""
 
+    mock_target_instance = MagicMock()
+    mock_target_instance.generate.return_value = [tmp_path / "CLAUDE.md"]
+
     with (
         patch("handover.server.get_parser") as mock_get_parser,
         patch("handover.server._summarizer.summarize", return_value=mock_context),
-        patch("handover.server.Generator") as mock_gen_cls,
+        patch(
+            "handover.targets.claude_code.ClaudeCodeTarget",
+            return_value=mock_target_instance,
+        ),
     ):
         mock_parser = MagicMock()
         mock_parser.parse.return_value = [MagicMock()]
         mock_get_parser.return_value = mock_parser
-        mock_gen_cls.return_value = MagicMock()
 
         status, data = _post(
             port,

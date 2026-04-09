@@ -326,6 +326,80 @@ class TestMultiSourceCLI:
         assert result.exit_code == 0, result.output
 
 
+class TestTwoLayerScaffoldCLI:
+    """v1.1.0 — verify --no-handover-dir / --handover-dir-only / --overwrite-handover-dir."""
+
+    def _common_args(self, tmp_path: Path) -> list[str]:
+        return [
+            "--input",
+            str(FIXTURES / "claude_single.json"),
+            "--output",
+            str(tmp_path),
+            "--no-llm",
+        ]
+
+    def test_default_writes_both_layers(self, tmp_path: Path) -> None:
+        runner = CliRunner()
+        result = runner.invoke(main, self._common_args(tmp_path))
+        assert result.exit_code == 0, result.output
+        # Layer 1
+        assert (tmp_path / ".handover" / "manifest.yaml").exists()
+        assert (tmp_path / ".handover" / "work" / "backlog.json").exists()
+        # Layer 2 (claude-code default target)
+        assert (tmp_path / "CLAUDE.md").exists()
+        assert (tmp_path / "PLAN.md").exists()
+
+    def test_no_handover_dir_skips_layer1(self, tmp_path: Path) -> None:
+        runner = CliRunner()
+        result = runner.invoke(main, [*self._common_args(tmp_path), "--no-handover-dir"])
+        assert result.exit_code == 0, result.output
+        assert not (tmp_path / ".handover").exists()
+        # Legacy single-layer output still produced
+        assert (tmp_path / "CLAUDE.md").exists()
+        assert (tmp_path / "PLAN.md").exists()
+
+    def test_handover_dir_only_skips_targets(self, tmp_path: Path) -> None:
+        runner = CliRunner()
+        result = runner.invoke(main, [*self._common_args(tmp_path), "--handover-dir-only"])
+        assert result.exit_code == 0, result.output
+        assert (tmp_path / ".handover" / "manifest.yaml").exists()
+        # No target files written
+        assert not (tmp_path / "CLAUDE.md").exists()
+        assert not (tmp_path / "PLAN.md").exists()
+
+    def test_mutually_exclusive_flags_error(self, tmp_path: Path) -> None:
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            [*self._common_args(tmp_path), "--no-handover-dir", "--handover-dir-only"],
+        )
+        assert result.exit_code != 0
+        assert "mutually exclusive" in result.output.lower()
+
+    def test_existing_handover_dir_blocks_rerun(self, tmp_path: Path) -> None:
+        runner = CliRunner()
+        runner.invoke(main, self._common_args(tmp_path))
+        result = runner.invoke(main, self._common_args(tmp_path))
+        assert result.exit_code != 0
+        assert ".handover" in result.output
+
+    def test_overwrite_handover_dir_succeeds_on_rerun(self, tmp_path: Path) -> None:
+        runner = CliRunner()
+        runner.invoke(main, self._common_args(tmp_path))
+        result = runner.invoke(main, [*self._common_args(tmp_path), "--overwrite-handover-dir"])
+        assert result.exit_code == 0, result.output
+        assert (tmp_path / ".handover" / "manifest.yaml").exists()
+
+    def test_dry_run_lists_two_layer_paths(self, tmp_path: Path) -> None:
+        runner = CliRunner()
+        result = runner.invoke(main, [*self._common_args(tmp_path), "--dry-run"])
+        assert result.exit_code == 0, result.output
+        assert ".handover/manifest.yaml" in result.output
+        assert "CLAUDE.md" in result.output
+        # Filesystem still empty
+        assert not (tmp_path / ".handover").exists()
+
+
 class TestMergeCommand:
     """Regression tests for the merge subcommand."""
 

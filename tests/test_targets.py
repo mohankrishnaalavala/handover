@@ -142,6 +142,28 @@ class TestClaudeCodeTarget:
         content = (out_dir / "CLAUDE.md").read_text()
         assert content.startswith("# Custom")
 
+    def test_two_layer_claude_md_is_thin(self, tmp_path: Path) -> None:
+        """When a scaffold is supplied, CLAUDE.md should be the thin v2 index (<50 lines)."""
+        from handover.scaffold_extractor import extract_scaffold
+
+        scaffold = extract_scaffold([], make_context(), use_llm=False)
+        t = ClaudeCodeTarget(scaffold=scaffold, overwrite_workspace=True)
+        t.generate(make_context(), tmp_path)
+        claude_md = (tmp_path / "CLAUDE.md").read_text()
+        assert len(claude_md.splitlines()) < 50
+        # Thin index points back into .handover/
+        assert ".handover/" in claude_md
+
+    def test_two_layer_writes_claude_workspace(self, tmp_path: Path) -> None:
+        from handover.scaffold_extractor import extract_scaffold
+
+        scaffold = extract_scaffold([], make_context(), use_llm=False)
+        t = ClaudeCodeTarget(scaffold=scaffold, overwrite_workspace=True)
+        t.generate(make_context(), tmp_path)
+        # FastAPI in tech stack ⇒ backend-agent must exist
+        assert (tmp_path / ".claude" / "agents" / "backend-agent.md").exists()
+        assert (tmp_path / ".claude" / "settings.json").exists()
+
 
 # ---------------------------------------------------------------------------
 # CodexTarget

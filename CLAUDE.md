@@ -4,8 +4,8 @@
 CLI tool that parses AI chat exports and generates CLAUDE.md + PLAN.md
 artifacts for local terminal agents to ingest.
 
-**Current state:** v1.0.0 — Phases 1–6 complete (skipping 6.2 VS Code extension and 6.5 GitHub Action).  
-**Active branch:** Phase 6 — ecosystem & developer experience.
+**Current state:** v1.1.0 — Two-Layer Scaffold (`.handover/` + `.claude/`) shipping on top of Phases 1–6.
+**Active branch:** `feature/v1.1.0-two-layer-scaffold`.
 
 ## Tech Stack
 - Language: Python 3.11+
@@ -40,6 +40,13 @@ artifacts for local terminal agents to ingest.
 - **Phase 6:** `handover/publisher.py` uses `gh gist create` subprocess — requires `gh` CLI authenticated. No new core Python dependency.
 - **Phase 6:** `handover/mcp_server.py` uses `FastMCP` from `mcp>=1.0` (optional `[mcp]` extra). Import `mcp` only inside `mcp_server.py`; the CLI subcommand catches ImportError.
 - **Phase 6:** New CLI subcommands: `mcp`, `history`, `rerun`, `merge`, `pull`. New flag: `--publish` on main command.
+- **v1.1.0:** Two-Layer Scaffold pipeline is `parse → summarize → scaffold_extractor → universal_generator(.handover/) → target_generator(thin agent files)`.
+- **v1.1.0:** `handover/scaffold_extractor.py` makes one Claude API call for the 13 markdown bodies in `.handover/` and walks `DOMAIN_RULES` for domain detection. `--no-llm` falls back to `handover/scaffold_heuristics.py` (pure functions, no I/O).
+- **v1.1.0:** `handover/universal_generator.py` writes `.handover/` from the `HANDOVER_DIR_FILES` registry — adding a new file is one row plus a `.j2` template under `handover/templates/handover/`.
+- **v1.1.0:** `handover/scaffold_generator.py` writes the per-target `.claude/` workspace (only `claude-code` uses it). Hook scripts are chmod'd 0o755 on write.
+- **v1.1.0:** `ClaudeCodeTarget` switches between the legacy `claude_md.j2` (single-layer) and the thin `claude_md_v2.j2` index based on whether a `ScaffoldContext` is passed in. Targets never import scaffold logic directly — they consume `ScaffoldContext` via constructor injection.
+- **v1.1.0:** `ScaffoldContext` (in `models.py`) is the single carrier object — plain data only, no Jinja2 or filesystem reach. `schema_version` is bumped on breaking field changes.
+- **v1.1.0:** New CLI flags on the main command: `--no-handover-dir`, `--handover-dir-only`, `--overwrite-handover-dir`. New `POST /config` field on the server: `no_handover_dir`.
 
 ## Coding Standards
 - Type hints on all functions and methods
@@ -73,4 +80,16 @@ extension/
   popup/                    — extension popup UI (HTML + JS + CSS)
 scripts/build-extension.sh  — packages extension/ into dist/handover-extension.zip
 docs/browser-extension.md   — user guide for installing and using the extension
+```
+
+## Directory Guide (v1.1.0 additions)
+```
+handover/scaffold_extractor.py    — LLM call for .handover/ + DOMAIN_RULES registry
+handover/scaffold_heuristics.py   — pure-function --no-llm fallback
+handover/universal_generator.py   — writes .handover/ via HANDOVER_DIR_FILES registry
+handover/scaffold_generator.py    — writes .claude/ workspace (claude-code target only)
+handover/templates/handover/      — 20 Jinja2 templates for .handover/ files
+handover/templates/claude_md_v2.j2 — thin CLAUDE.md index (used in two-layer mode)
+handover/templates/{agent,skill,command,hook_pre_tool_use,settings_json}.j2
+docs/handover-directory.md        — user guide to the two-layer layout
 ```

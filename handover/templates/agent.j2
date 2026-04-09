@@ -1,0 +1,22 @@
+---
+name: {{ agent.name }}
+description: {{ agent.description }}
+---
+
+# {{ agent.name }}
+
+{{ agent.description }}
+
+## When to use
+
+This agent handles tasks involving: {{ agent.keywords | join(", ") }}.
+
+## System prompt
+
+{{ agent.system_prompt }}
+
+## References
+
+- `.handover/context/architecture.md` — overall system design
+- `.handover/context/decisions.md` — design decisions to respect
+- `.handover/standards/coding-standards.md` — coding rules
