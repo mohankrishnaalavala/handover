@@ -4,6 +4,61 @@ All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-04-09
+
+### Added — Two-Layer Scaffold (`.handover/` + `.claude/`)
+
+The biggest output change since v1.0: every run now produces a vendor-neutral
+project knowledge base in `.handover/` plus a thin per-target workspace
+(`.claude/` for `claude-code`). Costs exactly one extra Claude API call per
+run (or zero with `--no-llm`).
+
+- **`.handover/` (Layer 1 — universal)**: 21 files across 4 subdirectories
+  - `manifest.yaml` — version, source, target, project, generated_at
+  - `context/` — `overview.md`, `architecture.md`, `decisions.md` (ADR format),
+    `constraints.md`, `risks.md`, `acceptance-criteria.md`
+  - `work/` — `spec.md`, `tasks.md`, `milestones.md`, `backlog.json`
+  - `standards/` — `coding-standards.md`, `testing-standards.md`,
+    `security-guardrails.md`, `release-checklist.md`
+  - `prompts/` — `implement.md`, `review.md`, `debug.md`, `test.md`,
+    `onboard.md`, `continue.md`
+- **`.claude/` (Layer 2 — claude-code target)**: domain-detected workspace
+  - `agents/<name>.md` — backend, frontend, database, test, devops, docs
+    agents triggered by chat keywords (registry-driven)
+  - `skills/<name>.md` — attached to detected domains
+  - `commands/<name>.md` — default `run-tests`, `lint`
+  - `hooks/pre-tool-use.sh` — chmod +x'd on write
+  - `settings.json`
+- New CLI flags on `handover` main command:
+  - `--no-handover-dir` — skip Layer 1 (legacy v1.0.x output only)
+  - `--handover-dir-only` — write Layer 1, skip target files
+  - `--overwrite-handover-dir` — replace existing `.handover/` and `.claude/`
+- New modules (loosely coupled — each adds via a registry, not an `if/elif`):
+  - `handover/scaffold_extractor.py` — one LLM call → 13 markdown bodies +
+    `DOMAIN_RULES` registry for domain detection
+  - `handover/scaffold_heuristics.py` — pure-function `--no-llm` fallback
+  - `handover/universal_generator.py` — writes `.handover/` from
+    `HANDOVER_DIR_FILES` registry
+  - `handover/scaffold_generator.py` — writes `.claude/` workspace
+- New dataclasses in `handover/models.py`: `HandoverManifest`, `BacklogTask`,
+  `Milestone`, `Backlog`, `AgentSpec`, `SkillSpec`, `CommandSpec`, `HookSpec`,
+  `ScaffoldContext`. All carry `schema_version` for forward compatibility.
+- 26 new Jinja2 templates under `handover/templates/handover/` and
+  `handover/templates/{agent,skill,command,hook_pre_tool_use,settings_json}.j2`,
+  plus `claude_md_v2.j2` (a thin <50-line CLAUDE.md that indexes into
+  `.handover/`).
+- `handover serve`: `POST /config` accepts `no_handover_dir`; `POST /handover`
+  generates the two-layer output.
+- `docs/handover-directory.md` — user guide to the new layout.
+
+### Notes
+- Default behavior changes: `handover --input chat.json --output dir/` now
+  writes `.handover/` and `.claude/` in addition to `CLAUDE.md` + `PLAN.md`.
+  Use `--no-handover-dir` for the v1.0.x layout.
+- Adding a new agent domain is one entry in `DOMAIN_RULES`.
+  Adding a new `.handover/` file is one entry in `HANDOVER_DIR_FILES` plus a
+  `.j2` template.
+
 ## [1.0.1] - 2026-04-06
 
 ### Fixed

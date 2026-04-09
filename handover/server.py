@@ -26,7 +26,6 @@ from urllib.parse import urlparse
 
 from handover import __version__
 from handover import summarizer as _summarizer
-from handover.generator import Generator
 from handover.models import HandoverAPIError
 from handover.parsers import ADAPTER_REGISTRY, get_parser
 
@@ -37,20 +36,28 @@ class _ServerConfig:
     def __init__(self) -> None:
         self.output_dir: str = str(Path.cwd())
         self.no_llm: bool = False
+        self.no_handover_dir: bool = False
         self._lock: threading.Lock = threading.Lock()
 
-    def update(self, output_dir: str | None, no_llm: bool | None) -> None:
+    def update(
+        self,
+        output_dir: str | None,
+        no_llm: bool | None,
+        no_handover_dir: bool | None = None,
+    ) -> None:
         """Thread-safe config update."""
         with self._lock:
             if output_dir is not None:
                 self.output_dir = output_dir
             if no_llm is not None:
                 self.no_llm = no_llm
+            if no_handover_dir is not None:
+                self.no_handover_dir = no_handover_dir
 
-    def snapshot(self) -> tuple[str, bool]:
-        """Return a consistent (output_dir, no_llm) snapshot."""
+    def snapshot(self) -> tuple[str, bool, bool]:
+        """Return a consistent (output_dir, no_llm, no_handover_dir) snapshot."""
         with self._lock:
-            return self.output_dir, self.no_llm
+            return self.output_dir, self.no_llm, self.no_handover_dir
 
 
 _config = _ServerConfig()
@@ -139,7 +146,7 @@ class HandoverHandler(BaseHTTPRequestHandler):
             self._send_json(400, {"status": "error", "message": "'conversation' field is required"})
             return
 
-        output_dir, _ = _config.snapshot()
+        output_dir, _, _ = _config.snapshot()
         out = Path(output_dir)
         out.mkdir(parents=True, exist_ok=True)
 
@@ -163,7 +170,13 @@ class HandoverHandler(BaseHTTPRequestHandler):
         output_dir = data.get("output_dir")
         no_llm_raw = data.get("no_llm")
         no_llm = bool(no_llm_raw) if no_llm_raw is not None else None
-        _config.update(output_dir=output_dir, no_llm=no_llm)
+        no_handover_dir_raw = data.get("no_handover_dir")
+        no_handover_dir = bool(no_handover_dir_raw) if no_handover_dir_raw is not None else None
+        _config.update(
+            output_dir=output_dir,
+            no_llm=no_llm,
+            no_handover_dir=no_handover_dir,
+        )
         self._send_json(200, {"status": "ok"})
 
     def _handle_handover(self, data: dict[str, Any]) -> None:
@@ -183,7 +196,7 @@ class HandoverHandler(BaseHTTPRequestHandler):
             self._send_json(400, {"status": "error", "message": "'conversation' field is required"})
             return
 
-        output_dir, no_llm = _config.snapshot()
+        output_dir, no_llm, no_handover_dir = _config.snapshot()
         tmp_path: Path | None = None
 
         try:
@@ -221,8 +234,37 @@ class HandoverHandler(BaseHTTPRequestHandler):
             out = Path(output_dir)
             out.mkdir(parents=True, exist_ok=True)
 
-            gen = Generator()
-            gen.generate(context, out, dry_run=False)
+            # v1.1.0 — write the two-layer scaffold unless the client opted out.
+            scaffold = None
+            handover_dir_files: list[Path] = []
+            if not no_handover_dir:
+                from handover.scaffold_extractor import extract_scaffold
+                from handover.universal_generator import (
+                    HandoverDirExistsError,
+                    write_handover_dir,
+                )
+
+                scaffold = extract_scaffold(
+                    messages,
+                    context,
+                    use_llm=not no_llm,
+                    target="claude-code",
+                )
+                try:
+                    handover_dir_files = write_handover_dir(
+                        scaffold,
+                        out,
+                        overwrite=True,
+                    )
+                except HandoverDirExistsError:
+                    # `overwrite=True` above means this should never fire,
+                    # but keep the catch for forward-compat.
+                    handover_dir_files = []
+
+            from handover.targets.claude_code import ClaudeCodeTarget
+
+            target_obj = ClaudeCodeTarget(scaffold=scaffold, overwrite_workspace=True)
+            target_paths = target_obj.generate(context, out, dry_run=False)
 
             self._send_json(
                 200,
@@ -231,6 +273,8 @@ class HandoverHandler(BaseHTTPRequestHandler):
                     "output_dir": str(out),
                     "claude_md": str(out / "CLAUDE.md"),
                     "plan_md": str(out / "PLAN.md"),
+                    "handover_dir_files": [str(p) for p in handover_dir_files],
+                    "target_files": [str(p) for p in target_paths],
                 },
             )
 

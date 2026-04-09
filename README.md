@@ -81,6 +81,41 @@ Run without --dry-run to write files.
 
 ---
 
+## Two-Layer Output (v1.1.0)
+
+Every run produces two layers:
+
+1. **`.handover/`** — vendor-neutral knowledge base (always generated):
+   manifest, context (overview, architecture, ADR-style decisions, constraints,
+   risks, acceptance criteria), work plan (spec, tasks, milestones, backlog
+   JSON), standards, and 6 drop-in prompts. Portable across any agent.
+2. **Per-target workspace** — for `claude-code`, a thin `CLAUDE.md` index plus
+   `.claude/agents`, `.claude/skills`, `.claude/commands`, `.claude/hooks`, and
+   `settings.json`, populated by domain detection on the chat.
+
+```
+your-project/
+├── .handover/
+│   ├── manifest.yaml
+│   ├── context/   overview.md, architecture.md, decisions.md, ...
+│   ├── work/      spec.md, tasks.md, milestones.md, backlog.json
+│   ├── standards/ coding-standards.md, testing-standards.md, ...
+│   └── prompts/   implement.md, review.md, debug.md, ...
+├── .claude/
+│   ├── agents/    backend-agent.md, database-agent.md, ...
+│   ├── skills/    rest-conventions.md, ...
+│   ├── commands/  run-tests.md, lint.md
+│   ├── hooks/     pre-tool-use.sh
+│   └── settings.json
+├── CLAUDE.md      (thin index pointing into .handover/)
+└── PLAN.md
+```
+
+Skip Layer 1 with `--no-handover-dir`, write only Layer 1 with
+`--handover-dir-only`, replace existing layers with `--overwrite-handover-dir`.
+See [docs/handover-directory.md](docs/handover-directory.md) for the full
+layout and how to extend it.
+
 ## Agent-Aware Output
 
 `handover` parses your chat once and generates the files your chosen coding agent expects. Each target adapter owns its own filenames and format — Claude is one target, not the default mental model for the whole product.
@@ -123,6 +158,9 @@ handover --input <file> --output <dir> [OPTIONS]
 | `--launch` | off | Run `claude` in output directory after writing |
 | `--template` | — | Path to custom Jinja2 templates directory (claude-code target only) |
 | `--publish` | off | Publish generated artifacts to GitHub Gist after writing (requires `gh` CLI) |
+| `--no-handover-dir` | off | Skip the `.handover/` knowledge base (legacy v1.0.x output only) |
+| `--handover-dir-only` | off | Generate `.handover/` only, skip target-specific files |
+| `--overwrite-handover-dir` | off | Replace an existing `.handover/` (and `.claude/`) directory |
 
 ### Explore exports
 

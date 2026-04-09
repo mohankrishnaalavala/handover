@@ -84,6 +84,23 @@ class Generator:
         template = self._env.get_template("claude_md.j2")
         return str(template.render(context=context, version=__version__))
 
+    def render_claude_md_v2(self, context: HandoverContext) -> str:
+        """
+        Render the v1.1.0 thin CLAUDE.md that indexes into `.handover/`.
+
+        Used by `ClaudeCodeTarget` whenever the two-layer scaffold is on
+        (i.e. `--no-handover-dir` was NOT passed). The content stays under
+        50 lines and points the agent at the vendor-neutral knowledge base.
+
+        Args:
+            context: Populated HandoverContext.
+
+        Returns:
+            Rendered CLAUDE.md as a string.
+        """
+        template = self._env.get_template("claude_md_v2.j2")
+        return str(template.render(context=context, version=__version__))
+
     def render_plan_md(self, context: HandoverContext) -> str:
         """
         Render the PLAN.md artifact.

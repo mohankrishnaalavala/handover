@@ -98,6 +98,24 @@ _TARGET_CHOICES: list[str] = list_targets() + ["all"]
     default=False,
     help="Publish generated artifacts to a GitHub Gist after writing (requires gh CLI).",
 )
+@click.option(
+    "--no-handover-dir",
+    is_flag=True,
+    default=False,
+    help="Skip the .handover/ knowledge base (legacy v1.0.x output only).",
+)
+@click.option(
+    "--handover-dir-only",
+    is_flag=True,
+    default=False,
+    help="Generate the .handover/ knowledge base but skip target-specific files.",
+)
+@click.option(
+    "--overwrite-handover-dir",
+    is_flag=True,
+    default=False,
+    help="Replace an existing .handover/ (and .claude/) directory.",
+)
 @click.version_option(version=__version__, prog_name="handover")
 def main(
     ctx: click.Context,
@@ -112,6 +130,9 @@ def main(
     template: str | None,
     target: str,
     publish: bool,
+    no_handover_dir: bool,
+    handover_dir_only: bool,
+    overwrite_handover_dir: bool,
 ) -> None:
     """
     handover — Universal AI Chat to Local Agent Handover Tool.
@@ -226,6 +247,28 @@ def main(
             except Exception:
                 pass
 
+    # v1.1.0 — Two-Layer Scaffold extraction.
+    # When --no-handover-dir is NOT set, build a ScaffoldContext that powers
+    # both the universal `.handover/` knowledge base and the per-target
+    # `.claude/` workspace. Costs exactly one extra Claude API call (or
+    # zero with --no-llm).
+    if no_handover_dir and handover_dir_only:
+        raise click.UsageError("--no-handover-dir and --handover-dir-only are mutually exclusive.")
+
+    scaffold = None
+    if not no_handover_dir:
+        from handover.scaffold_extractor import extract_scaffold
+
+        try:
+            scaffold = extract_scaffold(
+                messages,
+                context,
+                use_llm=not no_llm,
+                target=target,
+            )
+        except HandoverAPIError as e:
+            raise click.ClickException(str(e)) from e
+
     # Generate artifacts
     from handover.targets import get_target, list_targets
     from handover.targets.base import BaseTarget
@@ -237,10 +280,16 @@ def main(
     def _make_target(t_name: str) -> BaseTarget:
         """Instantiate a target, applying template_dir to ClaudeCodeTarget."""
         if t_name == "claude-code":
-            return ClaudeCodeTarget(template_dir=template_dir)
+            return ClaudeCodeTarget(
+                template_dir=template_dir,
+                scaffold=scaffold,
+                overwrite_workspace=overwrite_handover_dir,
+            )
         return get_target(t_name)
 
     if dry_run:
+        from handover.universal_generator import write_handover_dir
+
         click.echo(f"\nParsing: {context.conversation_title or input_path.name!r}")
         click.echo(f"  Source : {source} ({fmt_version})")
         click.echo(f"  Messages: {len(messages)}")
@@ -251,16 +300,42 @@ def main(
         click.echo(f"  Tasks      : {len(context.tasks)}")
         click.echo(f"  Constraints: {len(context.constraints)}")
         click.echo(f"  Questions  : {len(context.open_questions)}")
-        click.echo(f"\nTarget: {target}  |  Would write to {output_path}/:")
-        for t_name in targets_to_run:
-            paths = _make_target(t_name).generate(context, output_path, dry_run=True)
-            for p in paths:
+
+        layers = []
+        if scaffold is not None:
+            layers.append(".handover/")
+        if not handover_dir_only:
+            layers.append(f"target={target}")
+        click.echo(f"\nLayers: {', '.join(layers) or '(none)'}")
+        click.echo(f"Would write to {output_path}/:")
+
+        if scaffold is not None:
+            for p in write_handover_dir(scaffold, output_path, dry_run=True):
                 click.echo(f"  -> {p.relative_to(output_path)}")
+        if not handover_dir_only:
+            for t_name in targets_to_run:
+                paths = _make_target(t_name).generate(context, output_path, dry_run=True)
+                for p in paths:
+                    click.echo(f"  -> {p.relative_to(output_path)}")
         click.echo("\nRun without --dry-run to write files.")
     else:
+        from handover.universal_generator import HandoverDirExistsError, write_handover_dir
+
         all_paths: list[Path] = []
-        for t_name in targets_to_run:
-            all_paths.extend(_make_target(t_name).generate(context, output_path, dry_run=False))
+        if scaffold is not None:
+            try:
+                all_paths.extend(
+                    write_handover_dir(
+                        scaffold,
+                        output_path,
+                        overwrite=overwrite_handover_dir,
+                    )
+                )
+            except HandoverDirExistsError as e:
+                raise click.ClickException(str(e)) from e
+        if not handover_dir_only:
+            for t_name in targets_to_run:
+                all_paths.extend(_make_target(t_name).generate(context, output_path, dry_run=False))
         names = ", ".join(str(p.relative_to(output_path)) for p in all_paths)
         click.echo(f"Wrote {names} to {output_path}/")
 
