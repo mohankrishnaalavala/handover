@@ -30,6 +30,13 @@ class AiderTarget(BaseTarget):
         """Target identifier: 'aider'."""
         return "aider"
 
+    def describe(self) -> dict[str, str]:
+        """Return human-readable metadata about this target."""
+        return {
+            "name": "aider",
+            "description": "aider — generates .aider.conf.yml with conventions",
+        }
+
     def generate(
         self,
         context: HandoverContext,

@@ -35,6 +35,13 @@ class ClaudeCodeTarget(BaseTarget):
         """Target identifier: 'claude-code'."""
         return "claude-code"
 
+    def describe(self) -> dict[str, str]:
+        """Return human-readable metadata about this target."""
+        return {
+            "name": "claude-code",
+            "description": "Claude Code — generates CLAUDE.md + PLAN.md",
+        }
+
     def generate(
         self,
         context: HandoverContext,

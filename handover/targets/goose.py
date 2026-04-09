@@ -34,6 +34,13 @@ class GooseTarget(BaseTarget):
         """Target identifier: 'goose'."""
         return "goose"
 
+    def describe(self) -> dict[str, str]:
+        """Return human-readable metadata about this target."""
+        return {
+            "name": "goose",
+            "description": "Goose (Block) — generates goose-context.json",
+        }
+
     def generate(
         self,
         context: HandoverContext,

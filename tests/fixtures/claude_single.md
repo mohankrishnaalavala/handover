@@ -17,8 +17,7 @@ For the stack I'd suggest:
 2. Implement JWT auth middleware
 3. Define PostgreSQL schema
 4. Write unit tests for auth
-5. Add tasks CRUD endpoints
-6. Add team membership endpoints
+5. Add team membership endpoints
 
 Open question: Which ORM should we use — SQLAlchemy vs Tortoise ORM?
 

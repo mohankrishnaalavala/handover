@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "handover": {
+      "command": "/Users/mohankrishnaalavala/.handover-venv/bin/handover",
+      "args": ["mcp"],
+      "env": {
+        "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}"
+      }
+    }
+  }
+}
