@@ -58,3 +58,15 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 python_version = "3.11"
 strict = true
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "handover.cli"
+disallow_untyped_decorators = false
+
+[[tool.mypy.overrides]]
+module = "handover.watcher"
+disallow_subclassing_any = false
+
+[[tool.mypy.overrides]]
+module = "handover.mcp_server"
+disallow_untyped_decorators = false
