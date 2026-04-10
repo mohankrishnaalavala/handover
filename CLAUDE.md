@@ -4,8 +4,8 @@
 CLI tool that parses AI chat exports and generates CLAUDE.md + PLAN.md
 artifacts for local terminal agents to ingest.
 
-**Current state:** v1.1.0 — Two-Layer Scaffold (`.handover/` + `.claude/`) shipping on top of Phases 1–6.
-**Active branch:** `feature/v1.1.0-two-layer-scaffold`.
+**Current state:** v1.1.1 — MCP server now exposes four tools (`run_handover`, `handover_status`, `handover_reverse`, `handover_list`), built on the v1.1.0 two-layer scaffold.
+**Active branch:** `feature/v1.1.1-mcp-four-tools`.
 
 ## Tech Stack
 - Language: Python 3.11+
@@ -47,6 +47,7 @@ artifacts for local terminal agents to ingest.
 - **v1.1.0:** `ClaudeCodeTarget` switches between the legacy `claude_md.j2` (single-layer) and the thin `claude_md_v2.j2` index based on whether a `ScaffoldContext` is passed in. Targets never import scaffold logic directly — they consume `ScaffoldContext` via constructor injection.
 - **v1.1.0:** `ScaffoldContext` (in `models.py`) is the single carrier object — plain data only, no Jinja2 or filesystem reach. `schema_version` is bumped on breaking field changes.
 - **v1.1.0:** New CLI flags on the main command: `--no-handover-dir`, `--handover-dir-only`, `--overwrite-handover-dir`. New `POST /config` field on the server: `no_handover_dir`.
+- **v1.1.1:** `handover/mcp_server.py` exposes four tools: `run_handover`, `handover_status`, `handover_reverse`, `handover_list`. Each `@mcp.tool()` wrapper delegates to a plain `*_impl` function so the impls are unit-testable without the MCP SDK installed. Add new tools by following the same `*_impl` + decorator-wrapper pattern. `handover_status_impl` reads `.handover/work/backlog.json` directly — never parse `tasks.md` checkboxes.
 
 ## Coding Standards
 - Type hints on all functions and methods
