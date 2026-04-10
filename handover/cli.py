@@ -116,6 +116,12 @@ _TARGET_CHOICES: list[str] = list_targets() + ["all"]
     default=False,
     help="Replace an existing .handover/ (and .claude/) directory.",
 )
+@click.option(
+    "--no-index",
+    is_flag=True,
+    default=False,
+    help="Skip the .handover/codebase/ index pass.",
+)
 @click.version_option(version=__version__, prog_name="handover")
 def main(
     ctx: click.Context,
@@ -133,6 +139,7 @@ def main(
     no_handover_dir: bool,
     handover_dir_only: bool,
     overwrite_handover_dir: bool,
+    no_index: bool,
 ) -> None:
     """
     handover — Universal AI Chat to Local Agent Handover Tool.
@@ -317,6 +324,15 @@ def main(
                 paths = _make_target(t_name).generate(context, output_path, dry_run=True)
                 for p in paths:
                     click.echo(f"  -> {p.relative_to(output_path)}")
+        if not no_index and not no_handover_dir:
+            from handover.indexer import index_project
+
+            idx = index_project(output_path, dry_run=True)
+            if idx is not None:
+                click.echo(
+                    f"  -> .handover/codebase/ "
+                    f"({idx.stats['total_files']} files, {len(idx.symbols)} symbols)"
+                )
         click.echo("\nRun without --dry-run to write files.")
     else:
         from handover.universal_generator import HandoverDirExistsError, write_handover_dir
@@ -336,6 +352,17 @@ def main(
         if not handover_dir_only:
             for t_name in targets_to_run:
                 all_paths.extend(_make_target(t_name).generate(context, output_path, dry_run=False))
+        if not no_index and not no_handover_dir:
+            from handover.indexer import index_project
+
+            idx = index_project(output_path)
+            if idx is not None:
+                all_paths.extend([
+                    output_path / ".handover" / "codebase" / "structure.json",
+                    output_path / ".handover" / "codebase" / "symbols.json",
+                    output_path / ".handover" / "codebase" / "dependencies.json",
+                    output_path / ".handover" / "codebase" / "index.md",
+                ])
         names = ", ".join(str(p.relative_to(output_path)) for p in all_paths)
         click.echo(f"Wrote {names} to {output_path}/")
 
@@ -1108,3 +1135,93 @@ def pull_command(gist_url: str, output_dir: str | None) -> None:
     click.echo(f"Downloaded {len(written)} file(s) to {resolved_output}/:")
     for p in written:
         click.echo(f"  {p.name}")
+
+
+# ---------------------------------------------------------------------------
+# v1.1.2 — Codebase Indexer
+# ---------------------------------------------------------------------------
+
+
+@main.command("index")
+@click.option(
+    "--project",
+    "-p",
+    "project_dir",
+    type=click.Path(exists=True, file_okay=False),
+    required=True,
+    help="Project root directory to index.",
+)
+@click.option(
+    "--output",
+    "-o",
+    "output_dir",
+    type=click.Path(file_okay=False),
+    default=None,
+    help="Where to write .handover/codebase/ (default: project dir).",
+)
+@click.option(
+    "--refresh",
+    is_flag=True,
+    default=False,
+    help="Overwrite an existing codebase index.",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Show what would be indexed without writing files.",
+)
+@click.option(
+    "--exclude",
+    multiple=True,
+    help="Glob patterns to exclude (repeatable, e.g. --exclude 'legacy/**').",
+)
+def index_command(
+    project_dir: str,
+    output_dir: str | None,
+    refresh: bool,  # noqa: ARG001
+    dry_run: bool,
+    exclude: tuple[str, ...],
+) -> None:
+    """
+    Index an existing project's codebase.
+
+    Writes .handover/codebase/ with structure.json, symbols.json,
+    dependencies.json, and index.md.  The agent reads these files at session
+    start to skip the discovery phase.
+
+    Examples:
+
+      handover index --project ./my-project/
+
+      handover index --project ./my-project/ --dry-run
+
+      handover index --project . --exclude 'legacy/**'
+    """
+    from handover.indexer import index_project
+
+    project_path = Path(project_dir).resolve()
+    out_path = Path(output_dir).resolve() if output_dir else project_path
+
+    idx = index_project(
+        project_path,
+        out_path,
+        dry_run=dry_run,
+        exclude=exclude,
+        overwrite=True,
+    )
+
+    if idx is None:
+        click.echo("No source files found — nothing to index.")
+        return
+
+    if dry_run:
+        click.echo(
+            f"Would index {idx.stats['total_files']} files / "
+            f"{len(idx.symbols)} symbols."
+        )
+    else:
+        click.echo(
+            f"Indexed {idx.stats['total_files']} files → "
+            f"{out_path}/.handover/codebase/"
+        )

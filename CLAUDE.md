@@ -4,8 +4,8 @@
 CLI tool that parses AI chat exports and generates CLAUDE.md + PLAN.md
 artifacts for local terminal agents to ingest.
 
-**Current state:** v1.1.1 — MCP server now exposes four tools (`run_handover`, `handover_status`, `handover_reverse`, `handover_list`), built on the v1.1.0 two-layer scaffold.
-**Active branch:** `feature/v1.1.1-mcp-four-tools`.
+**Current state:** v1.1.2 — Codebase indexer writes `.handover/codebase/` (structure, symbols, dependencies, index).
+**Active branch:** `feature/v1.1.2-codebase-indexer`.
 
 ## Tech Stack
 - Language: Python 3.11+
@@ -48,6 +48,7 @@ artifacts for local terminal agents to ingest.
 - **v1.1.0:** `ScaffoldContext` (in `models.py`) is the single carrier object — plain data only, no Jinja2 or filesystem reach. `schema_version` is bumped on breaking field changes.
 - **v1.1.0:** New CLI flags on the main command: `--no-handover-dir`, `--handover-dir-only`, `--overwrite-handover-dir`. New `POST /config` field on the server: `no_handover_dir`.
 - **v1.1.1:** `handover/mcp_server.py` exposes four tools: `run_handover`, `handover_status`, `handover_reverse`, `handover_list`. Each `@mcp.tool()` wrapper delegates to a plain `*_impl` function so the impls are unit-testable without the MCP SDK installed. Add new tools by following the same `*_impl` + decorator-wrapper pattern. `handover_status_impl` reads `.handover/work/backlog.json` directly — never parse `tasks.md` checkboxes.
+- **v1.1.2:** `handover/indexer.py` + `handover/indexers/` is the codebase indexer. Runs locally (no API calls) as the last pipeline step. Language-specific indexers in `indexers/` follow the same registry pattern as `parsers/`: `BaseIndexer` → `PythonIndexer`, `TypeScriptIndexer`, `GenericIndexer`. Writes `.handover/codebase/` (structure.json, symbols.json, dependencies.json, index.md). New CLI subcommand: `handover index --project <dir>`. New flag: `--no-index` on the main command.
 
 ## Coding Standards
 - Type hints on all functions and methods
@@ -93,4 +94,16 @@ handover/templates/handover/      — 20 Jinja2 templates for .handover/ files
 handover/templates/claude_md_v2.j2 — thin CLAUDE.md index (used in two-layer mode)
 handover/templates/{agent,skill,command,hook_pre_tool_use,settings_json}.j2
 docs/handover-directory.md        — user guide to the two-layer layout
+```
+
+## Directory Guide (v1.1.2 additions)
+```
+handover/indexer.py               — main indexer: index_project(), refresh_index()
+handover/indexers/__init__.py     — INDEXER_REGISTRY, detect_indexer(), get_all_source_files()
+handover/indexers/base.py         — BaseIndexer ABC
+handover/indexers/python_indexer.py — ast.walk() based, precise
+handover/indexers/typescript_indexer.py — regex based
+handover/indexers/generic_indexer.py — fallback, file listing only
+handover/templates/handover/codebase_index_md.j2 — Jinja2 template for index.md
+docs/codebase-index.md            — user guide to .handover/codebase/
 ```

@@ -4,6 +4,46 @@ All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.1.2] - 2026-04-09
+
+### Added — Codebase Indexer
+
+The indexer scans a project directory and writes `.handover/codebase/` with
+four files that let an agent skip the discovery phase entirely:
+
+- **`structure.json`** — file tree with purpose, exports, imports, line count,
+  and test-file mapping for every source file.
+- **`symbols.json`** — all public functions and classes with signatures,
+  docstrings, and line numbers.
+- **`dependencies.json`** — internal import graph with change-impact risk
+  analysis (high/medium/low) per file.
+- **`index.md`** — human-readable "where to find things" summary.
+
+Language support:
+- **Python** — precise extraction via `ast.walk()` (functions, classes, imports,
+  module docstrings).
+- **TypeScript/JavaScript** — regex-based export/import extraction.
+- **Other files** — listed with line count, no symbol extraction.
+
+New CLI and pipeline features:
+- **`handover index --project <dir>`** — standalone CLI command to index an
+  existing project (supports `--dry-run`, `--exclude`, `--refresh`).
+- **`--no-index` flag** on the main `handover` command — skip the codebase
+  indexer pass.
+- The main pipeline now runs the indexer as the last step (after target
+  generation), silently skipping if no source files are found.
+- **MCP `run_handover`** now triggers the indexer and includes codebase stats
+  in its response.
+- **MCP `handover_status`** now reads `dependencies.json` to show "At risk"
+  files when a completed task includes `changed_files`.
+
+### Migration
+
+No breaking changes. The indexer runs automatically but is a no-op for
+projects with no source files. Use `--no-index` to skip explicitly.
+
+---
+
 ## [1.1.1] - 2026-04-09
 
 ### Added — MCP server now exposes four tools

@@ -140,6 +140,15 @@ def run_handover_impl(
             t_obj = get_target(t_name)
         all_paths.extend(t_obj.generate(context, output_path, dry_run=False))
 
+    # v1.1.2 — run codebase indexer as the last step
+    idx = None
+    try:
+        from handover.indexer import index_project
+
+        idx = index_project(output_path)
+    except Exception:  # noqa: BLE001 — indexer errors should not break the pipeline
+        pass
+
     lines = [f"Generated {len(all_paths)} files in {output_path}/"]
 
     handover_dir = output_path / ".handover"
@@ -170,6 +179,12 @@ def run_handover_impl(
                     workspace_counts.append(f"{n} {suffix}")
         if workspace_counts:
             lines.append(f"  .claude/: {', '.join(workspace_counts)}")
+
+    if idx is not None:
+        lines.append(
+            f"  .handover/codebase/: {idx.stats['total_files']} files, "
+            f"{len(idx.symbols)} symbols"
+        )
 
     lines.append(f"Goal: {context.goal or '(none detected)'}")
     lines.append(
@@ -232,11 +247,31 @@ def handover_status_impl(project_dir: str = ".") -> str:
     if remaining:
         lines.append(f"Next task: {remaining[0].get('title', '(untitled)')}")
 
+    last: dict[str, object] | None = None
     if done:
         last = done[-1]
         lines.append(f"Last completed: {last.get('title', '(untitled)')}")
         if last.get("done_at"):
             lines.append(f"  at {str(last['done_at'])[:10]}")
+
+    # v1.1.2 — change impact from codebase index
+    deps_path = resolved / ".handover" / "codebase" / "dependencies.json"
+    if deps_path.exists() and last and last.get("changed_files"):
+        try:
+            deps = json.loads(deps_path.read_text(encoding="utf-8"))
+            impact = deps.get("change_impact", {})
+            at_risk: set[str] = set()
+            changed = last.get("changed_files", [])
+            for f in changed if isinstance(changed, list) else []:
+                ci = impact.get(f) or {}
+                at_risk.update(ci.get("direct_dependents", []))
+                at_risk.update(ci.get("affected_tests", []))
+            if at_risk:
+                lines.append("At risk:")
+                for risk_file in sorted(at_risk)[:5]:
+                    lines.append(f"  • {risk_file}")
+        except (OSError, json.JSONDecodeError):
+            pass
 
     lines.append("")
     lines.append(f"Full task list: {backlog_path}")

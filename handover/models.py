@@ -293,3 +293,65 @@ class ScaffoldContext:
     skills: list[SkillSpec] = field(default_factory=list)
     commands: list[CommandSpec] = field(default_factory=list)
     hooks: list[HookSpec] = field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# v1.1.2 — Codebase Index
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class FileIndex:
+    """Metadata about a single source file in the indexed project."""
+
+    path: str
+    purpose: str  # first line of module docstring, or ""
+    exports: list[str] = field(default_factory=list)
+    imports_internal: list[str] = field(default_factory=list)
+    imports_external: list[str] = field(default_factory=list)
+    line_count: int = 0
+    has_tests: bool = False
+    test_file: str | None = None
+
+
+@dataclass
+class Symbol:
+    """A public function, class, or constant extracted from a source file."""
+
+    name: str
+    type: str  # "function" | "class" | "method" | "constant"
+    file: str
+    line: int = 0
+    signature: str = ""
+    docstring: str = ""
+
+
+@dataclass
+class DependencyNode:
+    """Import-graph node for a single file."""
+
+    depends_on: list[str] = field(default_factory=list)
+    depended_on_by: list[str] = field(default_factory=list)
+
+
+@dataclass
+class ChangeImpact:
+    """Risk assessment for a single file based on its dependency graph."""
+
+    direct_dependents: list[str] = field(default_factory=list)
+    affected_tests: list[str] = field(default_factory=list)
+    risk: str = "low"  # "high" | "medium" | "low"
+
+
+@dataclass
+class CodebaseIndex:
+    """Full codebase index — carrier for structure, symbols, and dependency data."""
+
+    schema_version: str = "1.0"
+    indexed_at: str = ""
+    root: str = ""
+    files: dict[str, FileIndex] = field(default_factory=dict)
+    symbols: list[Symbol] = field(default_factory=list)
+    dependency_graph: dict[str, DependencyNode] = field(default_factory=dict)
+    change_impact: dict[str, ChangeImpact] = field(default_factory=dict)
+    stats: dict[str, int] = field(default_factory=dict)
