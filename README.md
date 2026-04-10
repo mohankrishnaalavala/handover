@@ -239,7 +239,8 @@ handover pull abc123 --output ./my-project/
 
 ### MCP server for Claude Code
 
-Exposes `handover` as an MCP tool so Claude Code can call it directly.
+Exposes `handover` as an MCP server so Claude Code (or any MCP client) can
+call it directly. **Since v1.1.1 the server exposes four tools.**
 
 ```bash
 handover mcp
@@ -260,6 +261,15 @@ Add to `~/.claude/mcp.json`:
 }
 ```
 
+| Tool | What it does |
+|---|---|
+| `run_handover` | Parse a chat export and write `.handover/` + `.claude/` |
+| `handover_status` | Read `.handover/work/backlog.json` and report progress |
+| `handover_reverse` | Summarise the latest Claude Code session into `HANDOVER.md` |
+| `handover_list` | List conversations inside a chat export file |
+
+Full reference: [docs/mcp-server.md](docs/mcp-server.md).
+
 ---
 
 ## Roadmap
@@ -270,6 +280,8 @@ Add to `~/.claude/mcp.json`:
 | v0.3.0–v0.4.0 | 3 + 4 | `handover serve` + browser extension; reverse handover (`handover reverse`, `handover sessions`, `handover watch`) | ✅ Released |
 | v0.5.0 | 5 | Multi-target: Codex CLI, Aider, Goose; `--target all` | ✅ Released |
 | v1.0.0 | 6 | MCP server, `handover history`, `handover merge`, Gist publish/pull | ✅ Released |
+| v1.1.0 | — | Two-layer scaffold (`.handover/` + `.claude/`) | ✅ Released |
+| v1.1.1 | — | MCP server: four tools (`run_handover`, `handover_status`, `handover_reverse`, `handover_list`) | ✅ Released |
 | — | — | VS Code extension, GitHub Action | Coming soon |
 
 ---
