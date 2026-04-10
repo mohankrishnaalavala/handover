@@ -4,6 +4,39 @@ All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.1.1] - 2026-04-09
+
+### Added — MCP server now exposes four tools
+
+The MCP server (`handover mcp`) used to expose only `run_handover`. With the
+v1.1.0 two-layer scaffold landed, `backlog.json` is now a stable
+machine-readable surface — three additional tools wrap existing logic so a
+developer can stay entirely in chat.
+
+- **`run_handover`** *(updated)* — generates the workspace, and now lists the
+  `.handover/` subdirectories and `.claude/` workspace counts in the response.
+- **`handover_status`** *(new)* — reads `.handover/work/backlog.json` and
+  returns total/done/remaining counts, high-priority items, next task, and
+  last completed task. Perfect for "where are we?" from chat.
+- **`handover_reverse`** *(new)* — auto-discovers the most recent Claude Code
+  session for `project_dir`, runs the existing `reverse()` orchestrator, and
+  writes `HANDOVER.md`. Returns a short text summary.
+- **`handover_list`** *(new)* — lists conversations inside a chat export file
+  (id / date / title), capped at 20 with a "+ N more" tail.
+
+Each `@mcp.tool()` wrapper delegates to a plain `*_impl` function so the core
+logic is unit-testable without the MCP SDK. See [docs/mcp-server.md](docs/mcp-server.md).
+
+### Changed
+- `run_handover_impl` return string now includes `.handover/` and `.claude/`
+  summary lines when the two-layer scaffold is produced.
+
+### Migration
+- No breaking changes. The new tools are additive; existing `run_handover`
+  callers see only an enriched return string.
+
+---
+
 ## [1.1.0] - 2026-04-09
 
 ### Added — Two-Layer Scaffold (`.handover/` + `.claude/`)
