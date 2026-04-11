@@ -14,6 +14,7 @@ import re
 from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from handover.models import Decision, Task, UpdateDelta
 
@@ -237,7 +238,7 @@ def _append_tech_stack(existing_content: str, new_entries: dict[str, str]) -> st
     return existing_content.rstrip() + "\n" + new_lines + "\n"
 
 
-def _merge_backlog_json(existing_data: dict, delta: UpdateDelta) -> dict:
+def _merge_backlog_json(existing_data: dict[str, Any], delta: UpdateDelta) -> dict[str, Any]:
     """Merge new backlog tasks into existing backlog data."""
     # Preserve done status on existing tasks
     for task in existing_data.get("tasks", []):
