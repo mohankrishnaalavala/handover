@@ -423,7 +423,13 @@ def main(
     default=None,
     help="Force a specific parser adapter (default: auto-detect)",
 )
-def list_conversations(export_file: str, source: str | None) -> None:
+@click.option(
+    "--by-project",
+    is_flag=True,
+    default=False,
+    help="Group conversations by inferred project name",
+)
+def list_conversations(export_file: str, source: str | None, by_project: bool) -> None:
     """
     List all conversations in a multi-conversation export file.
 
@@ -433,6 +439,7 @@ def list_conversations(export_file: str, source: str | None) -> None:
 
       handover list export.jsonl
       handover list conversations.json
+      handover list export.jsonl --by-project
     """
     from handover.parsers import detect_source, get_parser
 
@@ -453,13 +460,26 @@ def list_conversations(export_file: str, source: str | None) -> None:
         click.echo("No conversations found.")
         return
 
-    # Table header
-    click.echo(f"\n{'ID':<38}  {'DATE':<12}  TITLE")
-    click.echo("-" * 100)
-    for conv in conversations:
-        date = conv["date"][:10] if conv["date"] else "unknown   "
-        click.echo(f"{conv['id']:<38}  {date:<12}  {conv['title']}")
-    click.echo(f"\n{len(conversations)} conversation(s) found.")
+    if by_project:
+        from handover.grouping import group_by_project
+
+        groups = group_by_project(conversations)
+        for project_name, convs in groups.items():
+            click.echo(f"\n{project_name} ({len(convs)} conversation(s))")
+            click.echo(f"  {'ID':<38}  {'DATE':<12}  TITLE")
+            click.echo("  " + "-" * 98)
+            for conv in convs:
+                date = conv["date"][:10] if conv["date"] else "unknown   "
+                click.echo(f"  {conv['id']:<38}  {date:<12}  {conv['title']}")
+        click.echo(f"\n{len(conversations)} conversation(s) in {len(groups)} project(s).")
+    else:
+        # Table header
+        click.echo(f"\n{'ID':<38}  {'DATE':<12}  TITLE")
+        click.echo("-" * 100)
+        for conv in conversations:
+            date = conv["date"][:10] if conv["date"] else "unknown   "
+            click.echo(f"{conv['id']:<38}  {date:<12}  {conv['title']}")
+        click.echo(f"\n{len(conversations)} conversation(s) found.")
 
 
 @main.command("serve")
@@ -973,6 +993,180 @@ def rerun_handover(handover_id: str) -> None:
         raise click.ClickException("Re-run failed. See output above.")
 
 
+@main.command("update")
+@click.option(
+    "--input",
+    "-i",
+    "input_file",
+    type=click.Path(exists=True),
+    required=True,
+    help="Chat export file with new context",
+)
+@click.option(
+    "--output",
+    "-o",
+    "output_dir",
+    type=click.Path(exists=True),
+    required=True,
+    help="Project directory containing existing .handover/",
+)
+@click.option(
+    "--source",
+    type=click.Choice(["claude", "chatgpt", "gemini", "perplexity"]),
+    default=None,
+    help="Force a specific parser adapter (default: auto-detect)",
+)
+@click.option(
+    "--no-llm",
+    is_flag=True,
+    default=False,
+    help="Use heuristic extraction instead of LLM",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Show what would change without writing files",
+)
+@click.option(
+    "--no-conflict",
+    is_flag=True,
+    default=False,
+    help="Skip revised-decision conflict markers (take latest)",
+)
+@click.option("--title", default=None, help="Select conversation by title substring")
+@click.option("--id", "conversation_id", default=None, help="Select conversation by ID")
+def update_command(
+    input_file: str,
+    output_dir: str,
+    source: str | None,
+    no_llm: bool,
+    dry_run: bool,
+    no_conflict: bool,
+    title: str | None,
+    conversation_id: str | None,
+) -> None:
+    """
+    Update an existing .handover/ directory with new context from a chat export.
+
+    Preserves completed tasks, appends new tasks and decisions, flags revised
+    decisions with conflict markers.
+
+    Examples:
+
+      handover update --input chat.json --output ./my-project/
+
+      handover update --input chat.json --output ./my-project/ --dry-run
+
+      handover update --input chat.json --output ./my-project/ --no-conflict
+    """
+    from handover.diff import compute_delta, parse_existing_handover
+    from handover.models import HandoverAPIError
+    from handover.parsers import detect_source, get_parser
+    from handover.scaffold_extractor import extract_scaffold
+    from handover.updater import apply_update
+
+    output_path = Path(output_dir)
+    handover_dir = output_path / ".handover"
+
+    if not handover_dir.exists():
+        raise click.ClickException(
+            f"No .handover/ directory found at {output_path}. "
+            "Run 'handover' first to generate the initial workspace, "
+            "then use 'handover update' to incrementally update it."
+        )
+
+    # Parse input
+    file_path = Path(input_file)
+    src = source
+    if src is None:
+        try:
+            src = detect_source(str(file_path))
+        except ValueError as e:
+            raise click.ClickException(str(e)) from e
+
+    parser = get_parser(src)
+
+    if conversation_id:
+        messages = parser.parse_by_id(file_path, conversation_id)
+    elif title:
+        convs = parser.list_conversations(file_path)
+        match = [c for c in convs if title.lower() in c.get("title", "").lower()]
+        if not match:
+            raise click.ClickException(f"No conversation matching title '{title}'.")
+        messages = parser.parse_by_id(file_path, match[0]["id"])
+    else:
+        messages = parser.parse(file_path)
+
+    if not messages:
+        raise click.ClickException("No messages found in input file.")
+
+    # Summarize fresh context
+    from handover import summarizer as _sum
+
+    try:
+        fresh_ctx = _sum.summarize(messages, use_llm=not no_llm)
+    except HandoverAPIError as e:
+        raise click.ClickException(str(e)) from e
+    fresh_ctx.source = src or "unknown"
+
+    # Build fresh scaffold for backlog comparison
+    try:
+        fresh_scaffold = extract_scaffold(messages, fresh_ctx, use_llm=not no_llm)
+    except HandoverAPIError as e:
+        raise click.ClickException(str(e)) from e
+
+    # Parse existing
+    existing_ctx, existing_backlog = parse_existing_handover(handover_dir)
+
+    # Compute delta
+    delta = compute_delta(existing_ctx, existing_backlog, fresh_ctx, fresh_scaffold.backlog)
+
+    if delta.is_empty:
+        click.echo("No changes detected — .handover/ is up to date.")
+        return
+
+    if dry_run:
+        click.echo("\nUpdate mode — comparing against existing .handover/\n")
+        if delta.preserved_done_tasks:
+            click.echo(f"  Preserved:    {len(delta.preserved_done_tasks)} completed task(s)")
+        if delta.new_tasks:
+            click.echo(f"  New tasks:    {len(delta.new_tasks)}")
+        if delta.new_decisions:
+            click.echo(f"  New decisions: {len(delta.new_decisions)}")
+        if delta.revised_decisions:
+            click.echo(
+                f"  Conflicts:    {len(delta.revised_decisions)}"
+                " (revised decisions — requires manual review)"
+            )
+        if delta.new_constraints:
+            click.echo(f"  New constraints: {len(delta.new_constraints)}")
+        if delta.new_open_questions:
+            click.echo(f"  New open questions: {len(delta.new_open_questions)}")
+        if delta.new_tech_stack:
+            click.echo(f"  New tech stack: {len(delta.new_tech_stack)} entries")
+        if delta.new_backlog_tasks:
+            click.echo(f"  New backlog tasks: {len(delta.new_backlog_tasks)}")
+        click.echo("\nRun without --dry-run to write.")
+        return
+
+    written = apply_update(
+        delta,
+        handover_dir,
+        dry_run=False,
+        no_conflict=no_conflict,
+        scaffold=fresh_scaffold,
+    )
+    names = ", ".join(p.name for p in written)
+    click.echo(f"Updated {len(written)} file(s): {names}")
+    if delta.preserved_done_tasks:
+        click.echo(f"  Preserved {len(delta.preserved_done_tasks)} completed task(s).")
+    if delta.revised_decisions and not no_conflict:
+        click.echo(
+            f"  {len(delta.revised_decisions)} revised decision(s) flagged — review decisions.md."
+        )
+
+
 @main.command("merge")
 @click.option(
     "--input",
@@ -1016,6 +1210,12 @@ def rerun_handover(handover_id: str) -> None:
     default=False,
     help="Print what would be written without writing files",
 )
+@click.option(
+    "--project",
+    default=None,
+    help="Filter conversations by project name "
+    "(requires single input file with multiple conversations)",
+)
 def merge_command(
     input_files: tuple[str, ...],
     output_dir: str,
@@ -1023,6 +1223,7 @@ def merge_command(
     no_llm: bool,
     target: str,
     dry_run: bool,
+    project: str | None,
 ) -> None:
     """
     Merge multiple chat exports into one unified context.
@@ -1034,6 +1235,8 @@ def merge_command(
       handover merge --input session1.json --input session2.json --output ./project/
 
       handover merge --input s1.json --input s2.json --output . --no-llm
+
+      handover merge --input export.jsonl --output ./project/ --project "Portfolio Website"
     """
     from handover.merger import merge_contexts
     from handover.models import HandoverAPIError
@@ -1042,12 +1245,15 @@ def merge_command(
     from handover.targets.base import BaseTarget
     from handover.targets.claude_code import ClaudeCodeTarget
 
-    if len(input_files) < 2:
-        raise click.UsageError("--merge requires at least two --input files.")
+    # --project filter: single input file, multiple conversations
+    if project is not None:
+        if len(input_files) != 1:
+            raise click.UsageError(
+                "--project requires exactly one input file with multiple conversations."
+            )
+        from handover.grouping import filter_by_project
 
-    contexts = []
-    for file_str in input_files:
-        file_path = Path(file_str)
+        file_path = Path(input_files[0])
         src = source
         if src is None:
             try:
@@ -1055,21 +1261,63 @@ def merge_command(
             except ValueError as e:
                 raise click.ClickException(str(e)) from e
         parser = get_parser(src)
-        try:
-            messages = parser.parse(file_path)
-        except (ValueError, FileNotFoundError) as e:
-            raise click.ClickException(f"Failed to parse {file_str}: {e}") from e
-        if not messages:
-            raise click.ClickException(f"No messages found in {file_str}.")
+        all_convs = parser.list_conversations(file_path)
+        matching = filter_by_project(all_convs, project)
+        if not matching:
+            raise click.ClickException(f"No conversations matching project '{project}' found.")
+        click.echo(f"Found {len(matching)} conversation(s) matching '{project}'.")
 
-        from handover import summarizer as _sum
+        contexts = []
+        for conv in matching:
+            try:
+                messages = parser.parse_by_id(file_path, conv["id"])
+            except (ValueError, FileNotFoundError) as e:
+                raise click.ClickException(f"Failed to parse conversation {conv['id']}: {e}") from e
+            if not messages:
+                continue
+            from handover import summarizer as _sum
 
-        try:
-            ctx = _sum.summarize(messages, use_llm=not no_llm)
-        except HandoverAPIError as e:
-            raise click.ClickException(str(e)) from e
-        ctx.source = src or "unknown"
-        contexts.append(ctx)
+            try:
+                ctx = _sum.summarize(messages, use_llm=not no_llm)
+            except HandoverAPIError as e:
+                raise click.ClickException(str(e)) from e
+            ctx.source = src or "unknown"
+            ctx.conversation_title = conv.get("title", "")
+            contexts.append(ctx)
+
+        if len(contexts) < 2:
+            raise click.ClickException(
+                f"Need at least 2 parseable conversations for merge, got {len(contexts)}."
+            )
+    else:
+        if len(input_files) < 2:
+            raise click.UsageError("--merge requires at least two --input files.")
+
+        contexts = []
+        for file_str in input_files:
+            file_path = Path(file_str)
+            src = source
+            if src is None:
+                try:
+                    src = detect_source(str(file_path))
+                except ValueError as e:
+                    raise click.ClickException(str(e)) from e
+            parser = get_parser(src)
+            try:
+                messages = parser.parse(file_path)
+            except (ValueError, FileNotFoundError) as e:
+                raise click.ClickException(f"Failed to parse {file_str}: {e}") from e
+            if not messages:
+                raise click.ClickException(f"No messages found in {file_str}.")
+
+            from handover import summarizer as _sum
+
+            try:
+                ctx = _sum.summarize(messages, use_llm=not no_llm)
+            except HandoverAPIError as e:
+                raise click.ClickException(str(e)) from e
+            ctx.source = src or "unknown"
+            contexts.append(ctx)
 
     click.echo(f"Merging {len(contexts)} conversations…")
     try:

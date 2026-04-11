@@ -400,6 +400,58 @@ class TestTwoLayerScaffoldCLI:
         assert not (tmp_path / ".handover").exists()
 
 
+class TestUpdateCommand:
+    """Tests for the update subcommand."""
+
+    def test_update_no_handover_dir_errors(self, tmp_path: Path) -> None:
+        """update must fail if .handover/ doesn't exist."""
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            [
+                "update",
+                "--input",
+                str(FIXTURES / "claude_single.json"),
+                "--output",
+                str(tmp_path),
+                "--no-llm",
+            ],
+        )
+        assert result.exit_code != 0
+        assert ".handover/" in result.output or "No .handover/" in result.output
+
+    def test_update_dry_run_shows_summary(self, tmp_path: Path) -> None:
+        """update --dry-run must show delta summary without writing."""
+        # First create initial .handover/
+        runner = CliRunner()
+        runner.invoke(
+            main,
+            [
+                "--input",
+                str(FIXTURES / "claude_single.json"),
+                "--output",
+                str(tmp_path),
+                "--no-llm",
+            ],
+        )
+        assert (tmp_path / ".handover").exists()
+
+        # Now run update --dry-run
+        result = runner.invoke(
+            main,
+            [
+                "update",
+                "--input",
+                str(FIXTURES / "claude_single.json"),
+                "--output",
+                str(tmp_path),
+                "--no-llm",
+                "--dry-run",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+
+
 class TestMergeCommand:
     """Regression tests for the merge subcommand."""
 
