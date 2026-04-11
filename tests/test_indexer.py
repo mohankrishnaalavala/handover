@@ -118,7 +118,7 @@ class TestTypeScriptIndexer:
         ts = tmp_path / "utils.ts"
         ts.write_text(
             "export function greet(name: string): string {\n"
-            '  return `hi ${name}`;\n'
+            "  return `hi ${name}`;\n"
             "}\n\n"
             "export class Logger {\n"
             "  log(msg: string) {}\n"
@@ -137,8 +137,7 @@ class TestTypeScriptIndexer:
     def test_classifies_relative_imports_as_internal(self, tmp_path: Path) -> None:
         ts = tmp_path / "main.ts"
         ts.write_text(
-            "import { greet } from './utils';\n"
-            "import express from 'express';\n",
+            "import { greet } from './utils';\nimport express from 'express';\n",
             encoding="utf-8",
         )
         indexer = TypeScriptIndexer()
@@ -379,9 +378,7 @@ class TestIndexProject:
             assert result.stats["total_files"] >= 3  # auth, models, database + __init__
 
             # auth.py should have exports
-            auth_files = [
-                p for p in result.files if p.endswith("auth.py") and "test" not in p
-            ]
+            auth_files = [p for p in result.files if p.endswith("auth.py") and "test" not in p]
             assert len(auth_files) >= 1
             auth = result.files[auth_files[0]]
             assert "create_token" in auth.exports

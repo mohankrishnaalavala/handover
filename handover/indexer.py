@@ -185,11 +185,7 @@ def _compute_change_impact(
         # Collect test files of direct dependents.
         for dep_path in direct_deps:
             dep_file = files.get(dep_path)
-            if (
-                dep_file
-                and dep_file.test_file
-                and dep_file.test_file not in affected_tests
-            ):
+            if dep_file and dep_file.test_file and dep_file.test_file not in affected_tests:
                 affected_tests.append(dep_file.test_file)
 
         # Also include own test file if present.

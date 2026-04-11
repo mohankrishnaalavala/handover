@@ -182,8 +182,7 @@ def run_handover_impl(
 
     if idx is not None:
         lines.append(
-            f"  .handover/codebase/: {idx.stats['total_files']} files, "
-            f"{len(idx.symbols)} symbols"
+            f"  .handover/codebase/: {idx.stats['total_files']} files, {len(idx.symbols)} symbols"
         )
 
     lines.append(f"Goal: {context.goal or '(none detected)'}")

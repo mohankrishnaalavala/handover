@@ -357,12 +357,14 @@ def main(
 
             idx = index_project(output_path)
             if idx is not None:
-                all_paths.extend([
-                    output_path / ".handover" / "codebase" / "structure.json",
-                    output_path / ".handover" / "codebase" / "symbols.json",
-                    output_path / ".handover" / "codebase" / "dependencies.json",
-                    output_path / ".handover" / "codebase" / "index.md",
-                ])
+                all_paths.extend(
+                    [
+                        output_path / ".handover" / "codebase" / "structure.json",
+                        output_path / ".handover" / "codebase" / "symbols.json",
+                        output_path / ".handover" / "codebase" / "dependencies.json",
+                        output_path / ".handover" / "codebase" / "index.md",
+                    ]
+                )
         names = ", ".join(str(p.relative_to(output_path)) for p in all_paths)
         click.echo(f"Wrote {names} to {output_path}/")
 
@@ -1216,12 +1218,6 @@ def index_command(
         return
 
     if dry_run:
-        click.echo(
-            f"Would index {idx.stats['total_files']} files / "
-            f"{len(idx.symbols)} symbols."
-        )
+        click.echo(f"Would index {idx.stats['total_files']} files / {len(idx.symbols)} symbols.")
     else:
-        click.echo(
-            f"Indexed {idx.stats['total_files']} files → "
-            f"{out_path}/.handover/codebase/"
-        )
+        click.echo(f"Indexed {idx.stats['total_files']} files → {out_path}/.handover/codebase/")

@@ -178,9 +178,7 @@ def _classify_imports(
                 if rel_str not in internal:
                     internal.append(rel_str)
                 # Also resolve to a concrete path for the graph
-                _resolve_relative_import(
-                    file_path, project_root, node.level, node.module, internal
-                )
+                _resolve_relative_import(file_path, project_root, node.level, node.module, internal)
             elif node.module:
                 top = node.module.split(".")[0]
                 candidate = project_root / top.replace(".", "/")
