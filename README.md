@@ -39,6 +39,15 @@ handover list export.jsonl
 
 # Bulk export — select a specific conversation by title
 handover --input export.jsonl --title "API Design Discussion" --output ./my-project/
+
+# Incremental update — merge new context into existing .handover/ (v1.2.0)
+handover update --input follow-up.json --output ./my-project/
+
+# List conversations grouped by project (v1.2.0)
+handover list export.jsonl --by-project
+
+# Merge conversations by project name (v1.2.0)
+handover merge --input export.jsonl --project "API Design" --output ./my-project/
 ```
 
 ---
@@ -164,11 +173,33 @@ handover --input <file> --output <dir> [OPTIONS]
 | `--overwrite-handover-dir` | off | Replace an existing `.handover/` (and `.claude/`) directory |
 | `--no-index` | off | Skip the `.handover/codebase/` index pass |
 
+### Incremental update (v1.2.0)
+
+Update an existing `.handover/` directory with new conversation context — preserves completed task marks and manual edits.
+
+```bash
+handover update --input follow-up.json --output ./my-project/
+handover update --input follow-up.json --output ./my-project/ --no-llm --dry-run
+handover update --input follow-up.json --output ./my-project/ --no-conflict  # no conflict markers
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--input, -i` | required | New chat export file |
+| `--output, -o` | required | Directory containing existing `.handover/` |
+| `--source` | auto | Force parser |
+| `--title` | — | Select conversation by title |
+| `--id` | — | Select conversation by ID |
+| `--no-llm` | off | Heuristic-only extraction |
+| `--dry-run` | off | Show delta summary without writing |
+| `--no-conflict` | off | Take latest decision silently (no conflict markers) |
+
 ### Explore exports
 
 ```bash
 handover list <export_file>            # list all conversations in a bulk export
 handover list export.jsonl --source claude
+handover list export.jsonl --by-project  # group by project (v1.2.0)
 ```
 
 ### Scaffold custom templates
@@ -226,6 +257,7 @@ Combine two or more chat sessions into one unified `CLAUDE.md` + `PLAN.md`. Dedu
 ```bash
 handover merge --input session1.json --input session2.json --output ./my-project/
 handover merge --input s1.json --input s2.json --output . --no-llm --target all
+handover merge --input export.jsonl --project "API Design" --output ./my-project/  # v1.2.0
 ```
 
 ### Share via GitHub Gist
@@ -285,6 +317,7 @@ Full reference: [docs/mcp-server.md](docs/mcp-server.md).
 | v1.1.0 | — | Two-layer scaffold (`.handover/` + `.claude/`) | ✅ Released |
 | v1.1.1 | — | MCP server: four tools (`run_handover`, `handover_status`, `handover_reverse`, `handover_list`) | ✅ Released |
 | v1.1.2 | — | Codebase indexer (`.handover/codebase/`): structure, symbols, dependencies, change impact | ✅ Released |
+| v1.2.0 | — | Incremental update (`handover update`), multi-chat project grouping (`--by-project`, `--project`) | ✅ Released |
 | — | — | VS Code extension, GitHub Action | Coming soon |
 
 ---

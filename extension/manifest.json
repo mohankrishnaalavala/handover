@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "handover",
-  "version": "1.0.1",
+  "version": "1.2.0",
   "description": "Parse any AI chat and generate local agent context files — zero context lost.",
 
   "permissions": ["activeTab", "storage", "notifications", "downloads"],
