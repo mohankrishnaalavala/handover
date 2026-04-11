@@ -4,6 +4,58 @@ All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] - 2026-04-11
+
+### Added — Incremental Update & Project Grouping
+
+Two new capabilities that close the loop on iterative handover workflows:
+
+**Incremental Update (`handover update`)**
+
+Run `handover update` against an existing `.handover/` directory to merge new
+conversation context without losing completed task marks or manual edits.
+
+- Parses existing `.handover/` markdown files back into structured data
+  (round-trip fidelity with `scaffold_heuristics.py` output format).
+- Computes an `UpdateDelta` — new tasks, decisions, constraints, tech stack
+  entries, backlog items, and revised decisions (topic-matched).
+- Preserves `[x]` marks on tasks and `done: true` on backlog items.
+- Revised decisions get `## REVISED (detected YYYY-MM-DD)` conflict markers
+  (or `--no-conflict` to take the latest silently).
+- New ADRs continue the existing numbering sequence.
+- Prompt files are regenerated from templates (always safe).
+- `--dry-run` prints a delta summary without writing.
+
+**Multi-Chat Project Grouping**
+
+- `handover list export.jsonl --by-project` — groups conversations by
+  heuristic title clustering (separator-based prefix splitting + token overlap).
+- `handover merge --project "Project Name"` — filters conversations from a bulk
+  export by fuzzy project name match before merging.
+
+### New modules
+- `handover/diff.py` — `parse_existing_handover()`, `compute_delta()`
+- `handover/updater.py` — `apply_update()` (writes only changed files)
+- `handover/grouping.py` — `group_by_project()`, `filter_by_project()`
+
+### New dataclass
+- `UpdateDelta` in `handover/models.py` — carries all delta fields with an
+  `is_empty` property.
+
+### New CLI
+- `handover update --input <file> --output <dir>` — incremental update
+  subcommand with `--no-llm`, `--dry-run`, `--no-conflict`, `--title`, `--id`,
+  `--source` flags.
+- `handover list <file> --by-project` — grouped conversation listing.
+- `handover merge --project <name>` — filter-then-merge by project name.
+
+### Migration
+
+No breaking changes. Existing `.handover/` directories are compatible with
+`handover update` as-is — the parser reads the standard output format.
+
+---
+
 ## [1.1.2] - 2026-04-09
 
 ### Added — Codebase Indexer
@@ -212,5 +264,10 @@ run (or zero with `--no-llm`).
 - GitHub Actions CI (lint + test matrix on Python 3.11 + 3.12)
 - GitHub Actions release pipeline to TestPyPI and PyPI via Trusted Publisher
 
+[1.2.0]: https://github.com/mohankrishnaalavala/handover/compare/v1.1.2...v1.2.0
+[1.1.2]: https://github.com/mohankrishnaalavala/handover/compare/v1.1.1...v1.1.2
+[1.1.1]: https://github.com/mohankrishnaalavala/handover/compare/v1.1.0...v1.1.1
+[1.1.0]: https://github.com/mohankrishnaalavala/handover/compare/v1.0.1...v1.1.0
+[1.0.1]: https://github.com/mohankrishnaalavala/handover/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/mohankrishnaalavala/handover/compare/v0.2.0...v1.0.0
 [0.2.0]: https://github.com/mohankrishnaalavala/handover/releases/tag/v0.2.0
