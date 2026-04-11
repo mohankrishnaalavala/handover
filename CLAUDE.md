@@ -4,7 +4,7 @@
 CLI tool that parses AI chat exports and generates CLAUDE.md + PLAN.md
 artifacts for local terminal agents to ingest.
 
-**Current state:** v1.1.2 — Codebase indexer writes `.handover/codebase/` (structure, symbols, dependencies, index).
+**Current state:** v1.2.0 — Incremental update (`handover update`) + multi-chat project grouping (`--by-project`, `--project`).
 **Active branch:** `feature/v1.1.2-codebase-indexer`.
 
 ## Tech Stack
@@ -49,6 +49,10 @@ artifacts for local terminal agents to ingest.
 - **v1.1.0:** New CLI flags on the main command: `--no-handover-dir`, `--handover-dir-only`, `--overwrite-handover-dir`. New `POST /config` field on the server: `no_handover_dir`.
 - **v1.1.1:** `handover/mcp_server.py` exposes four tools: `run_handover`, `handover_status`, `handover_reverse`, `handover_list`. Each `@mcp.tool()` wrapper delegates to a plain `*_impl` function so the impls are unit-testable without the MCP SDK installed. Add new tools by following the same `*_impl` + decorator-wrapper pattern. `handover_status_impl` reads `.handover/work/backlog.json` directly — never parse `tasks.md` checkboxes.
 - **v1.1.2:** `handover/indexer.py` + `handover/indexers/` is the codebase indexer. Runs locally (no API calls) as the last pipeline step. Language-specific indexers in `indexers/` follow the same registry pattern as `parsers/`: `BaseIndexer` → `PythonIndexer`, `TypeScriptIndexer`, `GenericIndexer`. Writes `.handover/codebase/` (structure.json, symbols.json, dependencies.json, index.md). New CLI subcommand: `handover index --project <dir>`. New flag: `--no-index` on the main command.
+- **v1.2.0:** `handover/diff.py` parses existing `.handover/` markdown back into structured data and computes an `UpdateDelta` against fresh context. `handover/updater.py` applies the delta (appends tasks, decisions, conflict markers) without overwriting completed task marks.
+- **v1.2.0:** `handover/grouping.py` infers project names from conversation titles using heuristic prefix/token overlap. No NLP dependencies.
+- **v1.2.0:** `UpdateDelta` (in `models.py`) carries new tasks, new decisions, revised decisions (conflict pairs), new constraints, new backlog tasks, and preserved done-task references.
+- **v1.2.0:** New CLI subcommand: `handover update --input <file> --output <dir> [--dry-run] [--no-conflict] [--no-llm]`. New flags: `--by-project` on `list`, `--project` on `merge`.
 
 ## Coding Standards
 - Type hints on all functions and methods
@@ -69,6 +73,9 @@ artifacts for local terminal agents to ingest.
 - Generate HANDOVER.md: `handover reverse --project .`
 - List sessions: `handover sessions`
 - Watch sessions: `handover watch --project .`  (requires `pip install handover[watch]`)
+- Incremental update: `handover update --input chat.json --output ./project/`
+- List by project: `handover list export.jsonl --by-project`
+- Merge by project: `handover merge --input export.jsonl --output ./project/ --project "Name"`
 
 ## Directory Guide (Phase 3 additions)
 ```
@@ -107,3 +114,49 @@ handover/indexers/generic_indexer.py — fallback, file listing only
 handover/templates/handover/codebase_index_md.j2 — Jinja2 template for index.md
 docs/codebase-index.md            — user guide to .handover/codebase/
 ```
+
+## Directory Guide (v1.2.0 additions)
+```
+handover/diff.py                  — parse existing .handover/, compute UpdateDelta
+handover/updater.py               — apply delta to .handover/ files (incremental update)
+handover/grouping.py              — heuristic project grouping from conversation titles
+```
+
+<!-- code-review-graph MCP tools -->
+## MCP Tools: code-review-graph
+
+**IMPORTANT: This project has a knowledge graph. ALWAYS use the
+code-review-graph MCP tools BEFORE using Grep/Glob/Read to explore
+the codebase.** The graph is faster, cheaper (fewer tokens), and gives
+you structural context (callers, dependents, test coverage) that file
+scanning cannot.
+
+### When to use graph tools FIRST
+
+- **Exploring code**: `semantic_search_nodes` or `query_graph` instead of Grep
+- **Understanding impact**: `get_impact_radius` instead of manually tracing imports
+- **Code review**: `detect_changes` + `get_review_context` instead of reading entire files
+- **Finding relationships**: `query_graph` with callers_of/callees_of/imports_of/tests_for
+- **Architecture questions**: `get_architecture_overview` + `list_communities`
+
+Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
+
+### Key Tools
+
+| Tool | Use when |
+|------|----------|
+| `detect_changes` | Reviewing code changes — gives risk-scored analysis |
+| `get_review_context` | Need source snippets for review — token-efficient |
+| `get_impact_radius` | Understanding blast radius of a change |
+| `get_affected_flows` | Finding which execution paths are impacted |
+| `query_graph` | Tracing callers, callees, imports, tests, dependencies |
+| `semantic_search_nodes` | Finding functions/classes by name or keyword |
+| `get_architecture_overview` | Understanding high-level codebase structure |
+| `refactor_tool` | Planning renames, finding dead code |
+
+### Workflow
+
+1. The graph auto-updates on file changes (via hooks).
+2. Use `detect_changes` for code review.
+3. Use `get_affected_flows` to understand impact.
+4. Use `query_graph` pattern="tests_for" to check coverage.

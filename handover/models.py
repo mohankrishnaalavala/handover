@@ -219,6 +219,39 @@ class Backlog:
 
 
 @dataclass
+class UpdateDelta:
+    """Delta between an existing .handover/ directory and a freshly extracted context."""
+
+    new_tasks: list[Task] = field(default_factory=list)
+    preserved_done_tasks: list[str] = field(default_factory=list)  # titles of [x] tasks kept
+    new_decisions: list[Decision] = field(default_factory=list)
+    revised_decisions: list[tuple[Decision, Decision]] = field(default_factory=list)  # (old, new)
+    new_constraints: list[str] = field(default_factory=list)
+    new_non_goals: list[str] = field(default_factory=list)
+    new_open_questions: list[str] = field(default_factory=list)
+    new_tech_stack: dict[str, str] = field(default_factory=dict)  # keys not in existing
+    new_backlog_tasks: list[BacklogTask] = field(default_factory=list)
+    preserved_done_backlog: list[str] = field(default_factory=list)  # IDs kept
+    updated_at: str = ""
+
+    @property
+    def is_empty(self) -> bool:
+        """Return True when the delta contains no changes."""
+        return not any(
+            [
+                self.new_tasks,
+                self.new_decisions,
+                self.revised_decisions,
+                self.new_constraints,
+                self.new_non_goals,
+                self.new_open_questions,
+                self.new_tech_stack,
+                self.new_backlog_tasks,
+            ]
+        )
+
+
+@dataclass
 class AgentSpec:
     """Specification for a `.claude/agents/<name>.md` agent file."""
 
