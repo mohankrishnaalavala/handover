@@ -100,7 +100,8 @@ your-project/
 │   ├── context/   overview.md, architecture.md, decisions.md, ...
 │   ├── work/      spec.md, tasks.md, milestones.md, backlog.json
 │   ├── standards/ coding-standards.md, testing-standards.md, ...
-│   └── prompts/   implement.md, review.md, debug.md, ...
+│   ├── prompts/   implement.md, review.md, debug.md, ...
+│   └── codebase/  structure.json, symbols.json, dependencies.json, index.md
 ├── .claude/
 │   ├── agents/    backend-agent.md, database-agent.md, ...
 │   ├── skills/    rest-conventions.md, ...
@@ -161,6 +162,7 @@ handover --input <file> --output <dir> [OPTIONS]
 | `--no-handover-dir` | off | Skip the `.handover/` knowledge base (legacy v1.0.x output only) |
 | `--handover-dir-only` | off | Generate `.handover/` only, skip target-specific files |
 | `--overwrite-handover-dir` | off | Replace an existing `.handover/` (and `.claude/`) directory |
+| `--no-index` | off | Skip the `.handover/codebase/` index pass |
 
 ### Explore exports
 
@@ -282,6 +284,7 @@ Full reference: [docs/mcp-server.md](docs/mcp-server.md).
 | v1.0.0 | 6 | MCP server, `handover history`, `handover merge`, Gist publish/pull | ✅ Released |
 | v1.1.0 | — | Two-layer scaffold (`.handover/` + `.claude/`) | ✅ Released |
 | v1.1.1 | — | MCP server: four tools (`run_handover`, `handover_status`, `handover_reverse`, `handover_list`) | ✅ Released |
+| v1.1.2 | — | Codebase indexer (`.handover/codebase/`): structure, symbols, dependencies, change impact | ✅ Released |
 | — | — | VS Code extension, GitHub Action | Coming soon |
 
 ---
