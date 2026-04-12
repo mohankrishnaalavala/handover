@@ -4,6 +4,36 @@ All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.2.1] - 2026-04-12
+
+### Added — Backlog Sync from Codebase
+
+New `handover sync --project <dir>` subcommand closes the reverse gap for
+coding agents that do not write Claude Code session JSONL (Codex VS Code
+extension, Cursor, Continue, etc.).
+
+- Correlates tasks in `.handover/work/backlog.json` against the codebase
+  index (`.handover/codebase/index.md`) and recent `git log`.
+- Marks tasks `done: true` + stamps `done_at` when evidence indicates
+  completion; preserves tasks already marked done.
+- LLM mode (default): one Claude API call returns `{task_id: bool}`.
+- Heuristic mode (`--no-llm`): ≥2 non-stopword tokens from the task title
+  must appear in the index or git log. Conservative by design.
+- `--dry-run` prints the delta without writing.
+
+### Fixed
+
+- **Scaffold JSON truncation.** `handover --input <chat.json>` no longer
+  fails with "Scaffold model returned invalid JSON" when the model hits
+  the token limit mid-string. `max_tokens` raised to 16384 and a repair
+  pass reconstructs truncated JSON.
+- **zsh install docs.** README now quotes `pip install 'handover[watch]'`
+  and `pip install 'handover[mcp]'` so zsh users do not hit
+  `zsh: no matches found`.
+- **`.claude/settings.json`** now includes the required `permissions`
+  block so Claude Code stops reporting "Expected array, but received
+  undefined".
+
 ## [1.2.0] - 2026-04-11
 
 ### Added — Incremental Update & Project Grouping

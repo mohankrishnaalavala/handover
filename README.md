@@ -22,9 +22,12 @@ pip install handover
 Optional extras:
 
 ```bash
-pip install handover[watch]   # enables: handover watch (session file monitoring)
-pip install handover[mcp]     # enables: handover mcp (MCP server for Claude Code)
+pip install 'handover[watch]'   # enables: handover watch (session file monitoring)
+pip install 'handover[mcp]'     # enables: handover mcp (MCP server for Claude Code)
 ```
+
+> **zsh users:** the brackets must be quoted. Unquoted `pip install handover[watch]`
+> fails with `zsh: no matches found` because zsh interprets `[...]` as a glob.
 
 ---
 
@@ -42,6 +45,9 @@ handover --input export.jsonl --title "API Design Discussion" --output ./my-proj
 
 # Incremental update — merge new context into existing .handover/ (v1.2.0)
 handover update --input follow-up.json --output ./my-project/
+
+# Sync backlog task status from codebase evidence (v1.2.1)
+handover sync --project ./my-project/
 
 # List conversations grouped by project (v1.2.0)
 handover list export.jsonl --by-project
