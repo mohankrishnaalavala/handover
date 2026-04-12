@@ -1469,3 +1469,63 @@ def index_command(
         click.echo(f"Would index {idx.stats['total_files']} files / {len(idx.symbols)} symbols.")
     else:
         click.echo(f"Indexed {idx.stats['total_files']} files → {out_path}/.handover/codebase/")
+
+
+@main.command("sync")
+@click.option(
+    "--project",
+    "-p",
+    "project_dir",
+    type=click.Path(exists=True, file_okay=False),
+    required=True,
+    help="Project root containing .handover/work/backlog.json.",
+)
+@click.option(
+    "--no-llm",
+    is_flag=True,
+    default=False,
+    help="Skip the Claude API call; use keyword heuristics only.",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Show what would change without writing backlog.json.",
+)
+def sync_command(project_dir: str, no_llm: bool, dry_run: bool) -> None:
+    """
+    Update backlog.json task status from codebase state.
+
+    Correlates tasks in `.handover/work/backlog.json` against the codebase
+    index (`.handover/codebase/index.md`) and recent `git log`, marking
+    tasks `done: true` when evidence indicates they are complete. Tasks
+    already marked done are preserved.
+
+    Examples:
+
+      handover sync --project ./my-project/
+
+      handover sync --project . --no-llm
+
+      handover sync --project . --dry-run
+    """
+    from handover.sync import sync_backlog
+
+    project_path = Path(project_dir).resolve()
+
+    try:
+        result = sync_backlog(
+            project_path,
+            use_llm=not no_llm,
+            dry_run=dry_run,
+        )
+    except FileNotFoundError as e:
+        raise click.ClickException(str(e)) from e
+
+    verb = "Would mark" if dry_run else "Marked"
+    click.echo(
+        f"{verb} {result.tasks_marked_done} of {result.tasks_total} task(s) "
+        f"done ({result.already_done} already done, mode={result.mode})."
+    )
+    for task_id in result.task_ids_marked_done:
+        click.echo(f"  ✓ {task_id}")

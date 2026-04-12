@@ -53,6 +53,7 @@ artifacts for local terminal agents to ingest.
 - **v1.2.0:** `handover/grouping.py` infers project names from conversation titles using heuristic prefix/token overlap. No NLP dependencies.
 - **v1.2.0:** `UpdateDelta` (in `models.py`) carries new tasks, new decisions, revised decisions (conflict pairs), new constraints, new backlog tasks, and preserved done-task references.
 - **v1.2.0:** New CLI subcommand: `handover update --input <file> --output <dir> [--dry-run] [--no-conflict] [--no-llm]`. New flags: `--by-project` on `list`, `--project` on `merge`.
+- **v1.2.1:** `handover/sync.py` + `handover sync --project <dir>` subcommand. Correlates `.handover/work/backlog.json` against the codebase index + `git log` and marks completed tasks `done: true`. LLM mode = one Claude API call returning `{task_id: bool}`. Heuristic mode = keyword token matching (≥2 non-stopword tokens from the title must appear). Always preserves tasks already marked done. No new core deps.
 
 ## Coding Standards
 - Type hints on all functions and methods

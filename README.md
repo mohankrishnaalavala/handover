@@ -46,6 +46,9 @@ handover --input export.jsonl --title "API Design Discussion" --output ./my-proj
 # Incremental update — merge new context into existing .handover/ (v1.2.0)
 handover update --input follow-up.json --output ./my-project/
 
+# Sync backlog task status from codebase evidence (v1.2.1)
+handover sync --project ./my-project/
+
 # List conversations grouped by project (v1.2.0)
 handover list export.jsonl --by-project
 
