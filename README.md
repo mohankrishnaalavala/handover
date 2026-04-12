@@ -22,9 +22,12 @@ pip install handover
 Optional extras:
 
 ```bash
-pip install handover[watch]   # enables: handover watch (session file monitoring)
-pip install handover[mcp]     # enables: handover mcp (MCP server for Claude Code)
+pip install 'handover[watch]'   # enables: handover watch (session file monitoring)
+pip install 'handover[mcp]'     # enables: handover mcp (MCP server for Claude Code)
 ```
+
+> **zsh users:** the brackets must be quoted. Unquoted `pip install handover[watch]`
+> fails with `zsh: no matches found` because zsh interprets `[...]` as a glob.
 
 ---
 

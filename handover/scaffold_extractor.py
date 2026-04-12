@@ -421,6 +421,51 @@ def detect_domains(
 # ---------------------------------------------------------------------------
 
 
+def _repair_truncated_json(text: str) -> dict | None:
+    """
+    Attempt to repair JSON truncated mid-value by the LLM hitting max_tokens.
+
+    Strategy: walk backwards closing any open strings, then close open braces.
+    Returns the parsed dict on success, None on failure.
+    """
+    s = text.rstrip()
+    # Try parsing as-is first
+    try:
+        return json.loads(s)
+    except json.JSONDecodeError:
+        pass
+
+    # If truncated inside a string value, close the string and object
+    # Try progressively more aggressive repairs
+    repairs = [
+        s + '"}',  # truncated mid-value, close string + object
+        s + '"}\n}',  # truncated mid-nested value
+        s + '"}',  # close string + object
+    ]
+
+    # Also try truncating to the last complete key-value pair
+    last_complete = s.rfind('",')
+    if last_complete > 0:
+        repairs.append(s[: last_complete + 1] + "}")
+
+    # Try truncating to the last complete value (ending with ")
+    last_quote = s.rfind('"')
+    if last_quote > 0:
+        candidate = s[: last_quote + 1]
+        # Make sure we're closing a value, not a key
+        if not candidate.rstrip().endswith(":"):
+            repairs.append(candidate + "}")
+
+    for attempt in repairs:
+        try:
+            result = json.loads(attempt)
+            if isinstance(result, dict):
+                return result
+        except json.JSONDecodeError:
+            continue
+    return None
+
+
 def _extract_with_llm(messages: list[ConversationMessage]) -> ScaffoldContext:
     """
     Make a single Claude API call to produce the 13 markdown bodies.
@@ -437,7 +482,7 @@ def _extract_with_llm(messages: list[ConversationMessage]) -> ScaffoldContext:
         client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from environment
         response = client.messages.create(
             model=_MODEL,
-            max_tokens=8192,
+            max_tokens=16384,
             messages=[{"role": "user", "content": prompt}],
         )
     except anthropic.AuthenticationError as e:
@@ -461,10 +506,15 @@ def _extract_with_llm(messages: list[ConversationMessage]) -> ScaffoldContext:
 
     try:
         raw = json.loads(stripped)
-    except json.JSONDecodeError as e:
-        raise HandoverAPIError(
-            f"Scaffold model returned invalid JSON: {e}. Raw: {raw_text[:200]}"
-        ) from e
+    except json.JSONDecodeError:
+        # Response may have been truncated — attempt repair
+        raw = _repair_truncated_json(stripped)
+        if raw is None:
+            raise HandoverAPIError(
+                f"Scaffold model returned invalid JSON that could not be "
+                f"repaired (stop_reason={response.stop_reason}). "
+                f"Raw: {raw_text[:200]}"
+            )
 
     if not isinstance(raw, dict):
         raise HandoverAPIError("Scaffold model returned non-object JSON.")
