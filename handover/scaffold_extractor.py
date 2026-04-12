@@ -421,7 +421,7 @@ def detect_domains(
 # ---------------------------------------------------------------------------
 
 
-def _repair_truncated_json(text: str) -> dict | None:
+def _repair_truncated_json(text: str) -> dict[str, object] | None:
     """
     Attempt to repair JSON truncated mid-value by the LLM hitting max_tokens.
 
@@ -431,7 +431,8 @@ def _repair_truncated_json(text: str) -> dict | None:
     s = text.rstrip()
     # Try parsing as-is first
     try:
-        return json.loads(s)
+        result = json.loads(s)
+        return result if isinstance(result, dict) else None
     except json.JSONDecodeError:
         pass
 
@@ -506,7 +507,7 @@ def _extract_with_llm(messages: list[ConversationMessage]) -> ScaffoldContext:
 
     try:
         raw = json.loads(stripped)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
         # Response may have been truncated — attempt repair
         raw = _repair_truncated_json(stripped)
         if raw is None:
@@ -514,7 +515,7 @@ def _extract_with_llm(messages: list[ConversationMessage]) -> ScaffoldContext:
                 f"Scaffold model returned invalid JSON that could not be "
                 f"repaired (stop_reason={response.stop_reason}). "
                 f"Raw: {raw_text[:200]}"
-            )
+            ) from e
 
     if not isinstance(raw, dict):
         raise HandoverAPIError("Scaffold model returned non-object JSON.")
